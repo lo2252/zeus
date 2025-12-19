@@ -24,7 +24,7 @@ read_abf_to_df <- function(path, ...) {
   # Reads raw ABF file
   raw_abf <- readABF::readABF(path, ...)
   # Calls df conversion function
-  abf_as_df(raw_abf)
+  abf_as_df_wide(raw_abf) # Change to either _long or _wide
 
 
 }
@@ -35,7 +35,8 @@ read_abf_to_df <- function(path, ...) {
 #'
 #'
 
-abf_as_df <- function(raw_abf) {
+# Function in long format
+abf_as_df_long <- function(raw_abf) {
   stopifnot(inherits(raw_abf, "ABF"))
 
   # Stops if missing packages
@@ -63,10 +64,29 @@ abf_as_df <- function(raw_abf) {
       value = as.vector(m)
     )
   })
+
+  }
+
+
+# Function in wide
+abf_as_df_wide <- function(raw_abf) {
+  stopifnot(inherits(raw_abf, "ABF"))
+
+  dt <- raw_abf$samplingIntervalInSec
+  ch_names <- raw_abf$channelNames
+
+  purrr::imap_dfr(raw_abf$data, function(m,s) {
+    npts <- nrow(m)
+    time <- (seq_len(npts) - 1)* dt
+
+    df <- tibble::as_tibble(m, .name_repair = "minimal")
+    names(df) <- ch_names
+    tibble::add_column(df,
+                       sweep = s,
+                       time = time,
+                       .before = 1)
+  })
 }
-
-
-
 
 
 
