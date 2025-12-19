@@ -36,11 +36,34 @@ read_abf_to_df <- function(path, ...) {
 #'
 
 abf_as_df <- function(raw_abf) {
-  df <- as.data.frame(raw_abf, sweep = 1)
+  stopifnot(inherits(raw_abf, "ABF"))
 
+  # Stops if missing packages
+  if (!requireNamespace("purrr", quietly = TRUE)) {
+    stop("Package 'purrr' is required for this method.", call. = FALSE)
+  }
+  if (!requireNamespace("tibble", quietly = TRUE)) {
+    stop("Package 'tibble' is required for this method.", call. = FALSE)
+  }
+
+  dt <- raw_abf$samplingIntervalInSec
+  ch_names <- raw_abf$channelNames
+  ch_units <- raw_abf$channelUnits
+
+  purrr::imap_dfr(raw_abf$data, function(m, s) {
+    npts <- nrow(m)
+    time <- (seq_len(npts) - 1) * dt # seconds
+
+    # Creating long tibble
+    tibble::tibble(
+      sweep = s,
+      time = rep(time, times = ncol(m)),
+      channel = rep(ch_names, each = npts),
+      units = rep(ch_units, each = npts),
+      value = as.vector(m)
+    )
+  })
 }
-
-
 
 
 
