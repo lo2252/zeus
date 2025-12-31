@@ -7,7 +7,7 @@
 #' @author Logan Ouellette
 
 
-#' @title Read an ABF file and tryutn a tidy data frame
+#' @title Read an ABF file and convert to a tidy data frame
 #' @param path Path to a .abf file
 #' @param ... Passed to readABF::readABF()
 #' @return A data.frame
@@ -24,10 +24,12 @@ read_abf_to_df <- function(path, ...) {
   # Reads raw ABF file
   raw_abf <- readABF::readABF(path, ...)
   # Calls df conversion function
-  abf_as_df_wide(raw_abf) # Change to either _long or _wide
+  abf_as_df_long(raw_abf) # Change to either _long or _wide
 
 
 }
+
+# Convert to long DF -----------------------------------------------------------
 
 #' @title Convert readABF output to a standardizes data frame
 #'
@@ -68,6 +70,10 @@ abf_as_df_long <- function(raw_abf) {
   }
 
 
+
+# Convert to wide DF ------------------------------------------------------
+
+
 # Function in wide
 abf_as_df_wide <- function(raw_abf) {
   stopifnot(inherits(raw_abf, "ABF"))
@@ -89,6 +95,27 @@ abf_as_df_wide <- function(raw_abf) {
 }
 
 
+# Adding stimulus to column -----------------------------------------------
+
+## 12-30 Note: This is only going to work on long
+
+# Calibration table
+stim_calib <- data.frame(
+  stim_nd = c(6.0, 5.5, 5.0, 4.5, 4.0, 3.5, 3.0),
+  stim_irradiance_log10 = c(-5.98, -5.32, -5.00, -4.49, -3.96, -3.46, -2.93)
+)
+
+# ND: irradiance (log10(hv * um^-2 * sec^-1)) with interpolation
+
+nd_to_irradiance_log10 <- function(stim_nd, calib = stim_calib) {
+  calib <- calib[order(calib$stim_nd), ]
+  stats::approx(
+    x = calib$stim_nd,
+    y = alib$stim_irradiance_log10,
+    xout = stim_nd,
+    rule = 2
+  )$y
+}
 
 
 
