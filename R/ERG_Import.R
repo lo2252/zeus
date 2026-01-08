@@ -132,8 +132,33 @@ make_stim_nd_sweep_protocol <- function(
   nd_levels <- seq(nd_start, nd_end, by = nd_step)
   one_protocol <- rep(nd_levels, each = repeats_per_level)
   full <- rep(one_protocol, time = n_protocol_repeats)
+  setNames(full, as.character(seq_len(length(full))))
 }
 
+add_stimulus_cols_protocol <- function(df_long, calib = stim_calib) {
+  if (!requireNamespace("dplyr", quietly = TRUE)) stop("Need dplyr.", call. = FALSE)
+  if (!requireNamespace("tibble", quietly = TRUE)) stop("Need tibble.", call. = FALSE)
+
+  stime_nd_by_sweep <- make_stim_nd_sweep_protocol()
+
+  # Handles if df_long has more/less than 280 sweeps
+  nssweeps_df <- max(df_long$sweep, na.rm = TRUE)
+  if (nsweeps_df != length(stim_nd_by_sweep)) {
+    stop(
+      "Your ABF-derived df has ", nsweeps_df, " sweeps, but the protocol describes ",
+      length(stim_nd_by_sweep), " (280). Check file or protocol assumptions.",
+      call. = FALSE
+    )
+  }
+
+  stim_tbl <- tibble::tibble(
+    sweep = as.integer(names(stim_nd_by_sweep)),
+    stim_nd = as.numeric(stime_nd_by_sweep)
+  ) |>
+    dplyr::mutate(stim_irradiance_log10 = nd_to_irradiance_log10(stim_nd, calib = calib))
+
+  dplyr::left_join(df_long, stim_tbl, by = "sweep")
+}
 
 
 
