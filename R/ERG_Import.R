@@ -118,4 +118,22 @@ nd_to_irradiance_log10 <- function(stim_nd, calib = stim_calib) {
 }
 
 
+# Stimulus Schedule and irradiance mapping --------------------------------
+
+# Protocol: ND 3.0 to 6.0 by 0.5, each ND repeats 4 times, repeating the full sequence
+# 10 time = 280 sweeps
+make_stim_nd_sweep_protocol <- function(
+    nd_start = 3.0,
+    nd_end = 6.0,
+    nd_step = 0.5,
+    repeat_per_level = 4,
+    n_protocol_repeats = 10
+) {
+  nd_levels <- seq(nd_start, nd_end, by = nd_step)
+  one_protocol <- rep(nd_levels, each = repeats_per_level)
+  full <- rep(one_protocol, time = n_protocol_repeats)
+}
+
+
+
 
