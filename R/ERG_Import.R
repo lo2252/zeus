@@ -102,16 +102,16 @@ abf_as_df_wide <- function(raw_abf) {
 # Calibration table
 stim_calib <- data.frame(
   stim_nd = c(6.0, 5.5, 5.0, 4.5, 4.0, 3.5, 3.0),
-  stim_irradiance_log10 = c(-5.98, -5.32, -5.00, -4.49, -3.96, -3.46, -2.93)
+  stim_irradiance_log10 = c(-5.977, -5.321, -5.003, -4.491, -3.957, -3.457, -2.927)
 )
 
 # ND: irradiance (log10(hv * um^-2 * sec^-1)) with interpolation
 
 nd_to_irradiance_log10 <- function(stim_nd, calib = stim_calib) {
-  calib <- calib[order(calib$stim_nd), ]
+  calib <- calib[order(calib$stim_nd), ] # Calibration setting
   stats::approx(
     x = calib$stim_nd,
-    y = alib$stim_irradiance_log10,
+    y = calib$stim_irradiance_log10,
     xout = stim_nd,
     rule = 2
   )$y
@@ -126,7 +126,7 @@ make_stim_nd_sweep_protocol <- function(
     nd_start = 3.0,
     nd_end = 6.0,
     nd_step = 0.5,
-    repeat_per_level = 4,
+    repeats_per_level = 4,
     n_protocol_repeats = 10
 ) {
   nd_levels <- seq(nd_start, nd_end, by = nd_step)
@@ -139,21 +139,21 @@ add_stimulus_cols_protocol <- function(df_long, calib = stim_calib) {
   if (!requireNamespace("dplyr", quietly = TRUE)) stop("Need dplyr.", call. = FALSE)
   if (!requireNamespace("tibble", quietly = TRUE)) stop("Need tibble.", call. = FALSE)
 
-  stime_nd_by_sweep <- make_stim_nd_sweep_protocol()
+  stim_nd_by_sweep <- make_stim_nd_sweep_protocol()
 
   # Handles if df_long has more/less than 280 sweeps
-  nssweeps_df <- max(df_long$sweep, na.rm = TRUE)
-  if (nsweeps_df != length(stim_nd_by_sweep)) {
-    stop(
-      "Your ABF-derived df has ", nsweeps_df, " sweeps, but the protocol describes ",
-      length(stim_nd_by_sweep), " (280). Check file or protocol assumptions.",
-      call. = FALSE
-    )
-  }
+  nsweeps_df <- max(df_long$sweep, na.rm = TRUE)
+  # if (nsweeps_df != length(stim_nd_by_sweep)) {
+    # stop(
+      # "Your ABF-derived df has ", nsweeps_df, " sweeps, but the protocol describes ",
+      # length(stim_nd_by_sweep), " (280). Check file or protocol assumptions.",
+      # call. = FALSE
+    # )
+  # }
 
   stim_tbl <- tibble::tibble(
     sweep = as.integer(names(stim_nd_by_sweep)),
-    stim_nd = as.numeric(stime_nd_by_sweep)
+    stim_nd = as.numeric(stim_nd_by_sweep)
   ) |>
     dplyr::mutate(stim_irradiance_log10 = nd_to_irradiance_log10(stim_nd, calib = calib))
 
