@@ -139,6 +139,11 @@ add_stimulus_cols_protocol <- function(df_long, calib = stim_calib) {
   if (!requireNamespace("dplyr", quietly = TRUE)) stop("Need dplyr.", call. = FALSE)
   if (!requireNamespace("tibble", quietly = TRUE)) stop("Need tibble.", call. = FALSE)
 
+  # Drops sweep 281, which contains only NA's
+  df_long <- df_long |>
+    dplyr::filter(.data$sweep != 281)
+
+  # Build protocol ND schedule on
   stim_nd_by_sweep <- make_stim_nd_sweep_protocol()
 
   # Handles if df_long has more/less than 280 sweeps
