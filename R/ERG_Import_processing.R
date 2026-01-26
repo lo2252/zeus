@@ -14,9 +14,7 @@
 #' @export
 
 read_abf_to_df <- function(path, ...) {
-
   if(!file.exists(path)) stop("File not found: ", path, call. = FALSE)
-
   if (!requireNamespace("readABF", quietly = TRUE)) {
     stop("Package 'readABF' is required. Install it with install.packages('readABF').", call. = FALSE)
   }
