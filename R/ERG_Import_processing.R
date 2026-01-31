@@ -7,13 +7,12 @@
 #' @author Logan Ouellette
 
 
-#' @title Read an ABF file and convert to a tidy data frame
+#' @title Read an ABF file into zeus raw object
 #' @param path Path to a .abf file
 #' @param ... Passed to readABF::readABF()
-#' @return A data.frame
+#' @return An object of class 'zeus_abf_raw' wrapping the readABF output
 #' @export
-
-read_abf_to_df <- function(path, ...) {
+read_abf_raw <- function(path, ...) {
   if(!file.exists(path)) stop("File not found: ", path, call. = FALSE)
   if (!requireNamespace("readABF", quietly = TRUE)) {
     stop("Package 'readABF' is required. Install it with install.packages('readABF').", call. = FALSE)
@@ -21,11 +20,17 @@ read_abf_to_df <- function(path, ...) {
 
   # Reads raw ABF file
   raw_abf <- readABF::readABF(path, ...)
-  # Calls df conversion function
-  abf_as_df_long(raw_abf) # Change to either _long or _wide
 
-
+  structure(
+    list(
+      raw = raw_abf,
+      path = normalizePath(path, winslash = "/", mustWork = FALSE)
+    ),
+    class = "zeus_abf_raw"
+  )
 }
+
+
 
 # Convert to long DF -----------------------------------------------------------
 
@@ -176,7 +181,7 @@ add_stimulus_cols_protocol <- function(
       stim_irradiance_log10 = nd_to_irradiance_log10(stim_nd, calib = calib)
     )
 
-  # Left join keeps all rows, any sweeps outside of protocol recieve NA
+  # Left join keeps all rows, any sweeps outside of protocol receive NA
 
   dplyr::left_join(df_long, stim_tbl, by = "sweep")
 
