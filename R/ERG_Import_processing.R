@@ -95,24 +95,35 @@ abf_as_df_wide <- function(raw_abf) {
 
 # Adding stimulus to column -----------------------------------------------
 
-## 12-30 Note: This is only going to work on long
+#' Default Neutral Density (ND), irradiance calibration table
+#'
+#' @keywords internal
 
-# Calibration table
-stim_calib <- data.frame(
-  stim_nd = c(6.0, 5.5, 5.0, 4.5, 4.0, 3.5, 3.0),
-  stim_irradiance_log10 = c(-5.977, -5.321, -5.003, -4.491, -3.957, -3.457, -2.927)
-)
+.default_stim_calib <- function() {
+  data.frame(
+    stim_nd = c(6.0, 5.5, 5.0, 4.5, 4.0, 3.5, 3.0),
+    stim_irradiance_log10 = c(-5.977, -5.321, -5.003,
+                               -4.491, -3.957, -3.457, -2.927)
+  )
+}
 
-# ND: irradiance (log10(hv * um^-2 * sec^-1)) with interpolation
+#' Convert ND to log10 irradiance
+#'
+#' @param stim_nd Numeric vector of ND values.
+#' @param calib Optional calibration data frame with columns
+#'   `stim_nd` and `stim_irradiance_log10`.
+#'
+#' @return Numeric vector of log10 irradiance values.
+#' @export
 
-nd_to_irradiance_log10 <- function(stim_nd, calib = stim_calib) {
-  calib <- calib[order(calib$stim_nd), ] # Calibration setting
-  stats::approx(
-    x = calib$stim_nd,
-    y = calib$stim_irradiance_log10,
-    xout = stim_nd,
-    rule = 2
-  )$y
+nd_to_irradiance_log10 <- function(stim_nd, calib = NULL) {
+  if (is.null(calib)) calib <- .default_stim_calib()
+
+  x <- as.numeric(unlist(calib[["stim_nd"]]))
+  y <- as.numeric(unlist(calib[["stim_irradiance_log10"]]))
+
+  o <- order(x)
+  stats::approx(x = x[o], y = y[o], xout = stim_nd, rule = 2)$y
 }
 
 
@@ -129,38 +140,46 @@ make_stim_nd_sweep_protocol <- function(
 ) {
   nd_levels <- seq(nd_start, nd_end, by = nd_step)
   one_protocol <- rep(nd_levels, each = repeats_per_level)
-  full <- rep(one_protocol, time = n_protocol_repeats)
-  setNames(full, as.character(seq_len(length(full))))
+  full <- rep(one_protocol, times = n_protocol_repeats)
+  full
 }
 
-add_stimulus_cols_protocol <- function(df_long, calib = stim_calib) {
+add_stimulus_cols_protocol <- function(
+    df_long,
+    calib = NULL,
+    nd_start = 3.0,
+    nd_end = 6.0,
+    nd_step = 0.5,
+    repeats_per_level = 4,
+    n_protocol_repeats = 10) {
   if (!requireNamespace("dplyr", quietly = TRUE)) stop("Need dplyr.", call. = FALSE)
   if (!requireNamespace("tibble", quietly = TRUE)) stop("Need tibble.", call. = FALSE)
 
-  # Drops sweep 281, which contains only NA's
-  df_long <- df_long |>
-    dplyr::filter(.data$sweep != 281)
+  # Building protocol for ND schedule (length 280)
+  stim_nd_seq <- make_stim_nd_sweep_protocol(
+    nd_start = nd_start,
+    nd_end = nd_end,
+    nd_step = nd_step,
+    repeats_per_level = repeats_per_level,
+    n_protocol_repeats = n_protocol_repeats
+  )
 
-  # Build protocol ND schedule on
-  stim_nd_by_sweep <- make_stim_nd_sweep_protocol()
-
-  # Handles if df_long has more/less than 280 sweeps
-  nsweeps_df <- max(df_long$sweep, na.rm = TRUE)
-  # if (nsweeps_df != length(stim_nd_by_sweep)) {
-    # stop(
-      # "Your ABF-derived df has ", nsweeps_df, " sweeps, but the protocol describes ",
-      # length(stim_nd_by_sweep), " (280). Check file or protocol assumptions.",
-      # call. = FALSE
-    # )
-  # }
+  # Map protocol onto sweeps existing in data (keeping extra sweeps)
+  sweeps_present <- sort(unique(df_long$sweep))
+  n_map <- min(length(sweeps_present), length(stim_nd_seq))
 
   stim_tbl <- tibble::tibble(
-    sweep = as.integer(names(stim_nd_by_sweep)),
-    stim_nd = as.numeric(stim_nd_by_sweep)
-  ) |>
-    dplyr::mutate(stim_irradiance_log10 = nd_to_irradiance_log10(stim_nd, calib = calib))
+    sweep = sweeps_present[seq_len(n_map)],
+    stim_nd = stim_nd_seq[seq_len(n_map)]) |>
+
+    dplyr::mutate(
+      stim_irradiance_log10 = nd_to_irradiance_log10(stim_nd, calib = calib)
+    )
+
+  # Left join keeps all rows, any sweeps outside of protocol recieve NA
 
   dplyr::left_join(df_long, stim_tbl, by = "sweep")
+
 }
 
 
