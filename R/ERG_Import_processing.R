@@ -1,7 +1,7 @@
-#' @title Importing raw erg.abf files
+#' Importing raw erg.abf files
 #'
 #' @description
-#' This function will import the raw .abf and convert it into a usable data.frame for manipulation.\n
+#' This function will import the raw.abf and convert it into a usable data.frame for manipulation.\n
 #' This utilizes the package 'readABF', please see CRAN publications for this package for more information.
 #'
 #' @author Logan Ouellette
@@ -29,6 +29,60 @@ read_abf_raw <- function(path, ...) {
     class = "zeus_abf_raw"
   )
 }
+
+# Converting imported raw file into usable data.frame --------------------------
+
+#' Read an ABF file and return a standardized long data frame
+#'
+#' @param x Either a file path to a .abf, or a `zeus_abf_raw` object.
+#' @param ... Passed to readABF::readABF() only when `x` is a file path.
+#' @param add_stim Logical; attach protocol stimulus columns?
+#' @param calib Optional calibration table passed to nd_to_irradiance_log10().
+#' @param nd_start,nd_end,nd_step,repeats_per_level,n_protocol_repeats Protocol settings.
+#'
+#' @return A tibble/data.frame in standardized long format.
+#' @export
+
+read_abf <- function(
+  x,
+  ...,
+  add_stim = TRUE,
+  calib = NULL,
+  nd_start = 3.0,
+  nd_end = 6.0,
+  nd_step = 0.5,
+  repeats_per_level = 4,
+  n_protocol_repeats = 10) {
+
+  # Accept either a path or a zeus_abf_raw object
+  raw_abf <- NULL
+
+  if (inherits(x, "zeus_abf_raw")) {
+    raw_abf <- x$raw
+  } else if (is.character(x) && length(x) == 1) {
+    raw_abf <- read_abf_raw(x, ...)$raw
+  } else {
+    stop("'x' must be a file path or a 'zeus_abf_raw' object.", call = FALSE)
+  }
+
+  # Convert to long
+  df_long <- abf_as_df_long(raw_abf)
+
+  # Optional adding stimulus, default TRUE
+  if (isTRUE(add_stim)) {
+    df_long <- add_stimulus_cols_protocol(
+      df_long,
+      calib = calib,
+      nd_start = nd_start,
+      nd_end = nd_end,
+      nd_step = nd_step,
+      repeats_per_level = repeats_per_level,
+      n_protocol_repeats = n_protocol_repeats
+    )
+  }
+  df_long
+}
+
 
 
 
