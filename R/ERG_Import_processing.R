@@ -85,10 +85,9 @@ read_abf <- function(
 
 
 
-
 # Convert to long DF -----------------------------------------------------------
 
-#' @title Convert readABF output to a standardizes data frame
+#' Convert readABF output to a standardizes data frame
 #'
 #'
 #'
