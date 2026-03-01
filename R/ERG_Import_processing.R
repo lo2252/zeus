@@ -1,19 +1,18 @@
-#' @title Importing raw erg.abf files
+#' Importing raw erg.abf files
 #'
 #' @description
-#' This function will import the raw .abf and convert it into a usable data.frame for manipulation.\n
+#' This function will import the raw.abf and convert it into a usable data.frame for manipulation.\n
 #' This utilizes the package 'readABF', please see CRAN publications for this package for more information.
 #'
 #' @author Logan Ouellette
 
 
-#' @title Read an ABF file and convert to a tidy data frame
+#' @title Read an ABF file into zeus raw object
 #' @param path Path to a .abf file
 #' @param ... Passed to readABF::readABF()
-#' @return A data.frame
+#' @return An object of class 'zeus_abf_raw' wrapping the readABF output
 #' @export
-
-read_abf_to_df <- function(path, ...) {
+read_abf_raw <- function(path, ...) {
   if(!file.exists(path)) stop("File not found: ", path, call. = FALSE)
   if (!requireNamespace("readABF", quietly = TRUE)) {
     stop("Package 'readABF' is required. Install it with install.packages('readABF').", call. = FALSE)
@@ -21,15 +20,74 @@ read_abf_to_df <- function(path, ...) {
 
   # Reads raw ABF file
   raw_abf <- readABF::readABF(path, ...)
-  # Calls df conversion function
-  abf_as_df_long(raw_abf) # Change to either _long or _wide
 
-
+  structure(
+    list(
+      raw = raw_abf,
+      path = normalizePath(path, winslash = "/", mustWork = FALSE)
+    ),
+    class = "zeus_abf_raw"
+  )
 }
+
+# Converting imported raw file into usable data.frame --------------------------
+
+#' Read an ABF file and return a standardized long data frame
+#'
+#' @param x Either a file path to a .abf, or a `zeus_abf_raw` object.
+#' @param ... Passed to readABF::readABF() only when `x` is a file path.
+#' @param add_stim Logical; attach protocol stimulus columns?
+#' @param calib Optional calibration table passed to nd_to_irradiance_log10().
+#' @param nd_start,nd_end,nd_step,repeats_per_level,n_protocol_repeats Protocol settings.
+#'
+#' @return A tibble/data.frame in standardized long format.
+#' @export
+
+read_abf <- function(
+  x,
+  ...,
+  add_stim = TRUE,
+  calib = NULL,
+  nd_start = 3.0,
+  nd_end = 6.0,
+  nd_step = 0.5,
+  repeats_per_level = 4,
+  n_protocol_repeats = 10) {
+
+  # Accept either a path or a zeus_abf_raw object
+  raw_abf <- NULL
+
+  if (inherits(x, "zeus_abf_raw")) {
+    raw_abf <- x$raw
+  } else if (is.character(x) && length(x) == 1) {
+    raw_abf <- read_abf_raw(x, ...)$raw
+  } else {
+    stop("'x' must be a file path or a 'zeus_abf_raw' object.", call = FALSE)
+  }
+
+  # Convert to long
+  df_long <- abf_as_df_long(raw_abf)
+
+  # Optional adding stimulus, default TRUE
+  if (isTRUE(add_stim)) {
+    df_long <- add_stimulus_cols_protocol(
+      df_long,
+      calib = calib,
+      nd_start = nd_start,
+      nd_end = nd_end,
+      nd_step = nd_step,
+      repeats_per_level = repeats_per_level,
+      n_protocol_repeats = n_protocol_repeats
+    )
+  }
+  df_long
+}
+
+
 
 # Convert to long DF -----------------------------------------------------------
 
-#' @title Convert readABF output to a standardizes data frame
+#' Convert readABF output to a standardizes data frame
 #'
 #'
 #'
@@ -95,24 +153,35 @@ abf_as_df_wide <- function(raw_abf) {
 
 # Adding stimulus to column -----------------------------------------------
 
-## 12-30 Note: This is only going to work on long
+#' Default Neutral Density (ND), irradiance calibration table
+#'
+#' @keywords internal
 
-# Calibration table
-stim_calib <- data.frame(
-  stim_nd = c(6.0, 5.5, 5.0, 4.5, 4.0, 3.5, 3.0),
-  stim_irradiance_log10 = c(-5.977, -5.321, -5.003, -4.491, -3.957, -3.457, -2.927)
-)
+.default_stim_calib <- function() {
+  data.frame(
+    stim_nd = c(6.0, 5.5, 5.0, 4.5, 4.0, 3.5, 3.0),
+    stim_irradiance_log10 = c(-5.977, -5.321, -5.003,
+                               -4.491, -3.957, -3.457, -2.927)
+  )
+}
 
-# ND: irradiance (log10(hv * um^-2 * sec^-1)) with interpolation
+#' Convert ND to log10 irradiance
+#'
+#' @param stim_nd Numeric vector of ND values.
+#' @param calib Optional calibration data frame with columns
+#'   `stim_nd` and `stim_irradiance_log10`.
+#'
+#' @return Numeric vector of log10 irradiance values.
+#' @export
 
-nd_to_irradiance_log10 <- function(stim_nd, calib = stim_calib) {
-  calib <- calib[order(calib$stim_nd), ] # Calibration setting
-  stats::approx(
-    x = calib$stim_nd,
-    y = calib$stim_irradiance_log10,
-    xout = stim_nd,
-    rule = 2
-  )$y
+nd_to_irradiance_log10 <- function(stim_nd, calib = NULL) {
+  if (is.null(calib)) calib <- .default_stim_calib()
+
+  x <- as.numeric(unlist(calib[["stim_nd"]]))
+  y <- as.numeric(unlist(calib[["stim_irradiance_log10"]]))
+
+  o <- order(x)
+  stats::approx(x = x[o], y = y[o], xout = stim_nd, rule = 2)$y
 }
 
 
@@ -129,38 +198,46 @@ make_stim_nd_sweep_protocol <- function(
 ) {
   nd_levels <- seq(nd_start, nd_end, by = nd_step)
   one_protocol <- rep(nd_levels, each = repeats_per_level)
-  full <- rep(one_protocol, time = n_protocol_repeats)
-  setNames(full, as.character(seq_len(length(full))))
+  full <- rep(one_protocol, times = n_protocol_repeats)
+  full
 }
 
-add_stimulus_cols_protocol <- function(df_long, calib = stim_calib) {
+add_stimulus_cols_protocol <- function(
+    df_long,
+    calib = NULL,
+    nd_start = 3.0,
+    nd_end = 6.0,
+    nd_step = 0.5,
+    repeats_per_level = 4,
+    n_protocol_repeats = 10) {
   if (!requireNamespace("dplyr", quietly = TRUE)) stop("Need dplyr.", call. = FALSE)
   if (!requireNamespace("tibble", quietly = TRUE)) stop("Need tibble.", call. = FALSE)
 
-  # Drops sweep 281, which contains only NA's
-  df_long <- df_long |>
-    dplyr::filter(.data$sweep != 281)
+  # Building protocol for ND schedule (length 280)
+  stim_nd_seq <- make_stim_nd_sweep_protocol(
+    nd_start = nd_start,
+    nd_end = nd_end,
+    nd_step = nd_step,
+    repeats_per_level = repeats_per_level,
+    n_protocol_repeats = n_protocol_repeats
+  )
 
-  # Build protocol ND schedule on
-  stim_nd_by_sweep <- make_stim_nd_sweep_protocol()
-
-  # Handles if df_long has more/less than 280 sweeps
-  nsweeps_df <- max(df_long$sweep, na.rm = TRUE)
-  # if (nsweeps_df != length(stim_nd_by_sweep)) {
-    # stop(
-      # "Your ABF-derived df has ", nsweeps_df, " sweeps, but the protocol describes ",
-      # length(stim_nd_by_sweep), " (280). Check file or protocol assumptions.",
-      # call. = FALSE
-    # )
-  # }
+  # Map protocol onto sweeps existing in data (keeping extra sweeps)
+  sweeps_present <- sort(unique(df_long$sweep))
+  n_map <- min(length(sweeps_present), length(stim_nd_seq))
 
   stim_tbl <- tibble::tibble(
-    sweep = as.integer(names(stim_nd_by_sweep)),
-    stim_nd = as.numeric(stim_nd_by_sweep)
-  ) |>
-    dplyr::mutate(stim_irradiance_log10 = nd_to_irradiance_log10(stim_nd, calib = calib))
+    sweep = sweeps_present[seq_len(n_map)],
+    stim_nd = stim_nd_seq[seq_len(n_map)]) |>
+
+    dplyr::mutate(
+      stim_irradiance_log10 = nd_to_irradiance_log10(stim_nd, calib = calib)
+    )
+
+  # Left join keeps all rows, any sweeps outside of protocol receive NA
 
   dplyr::left_join(df_long, stim_tbl, by = "sweep")
+
 }
 
 
