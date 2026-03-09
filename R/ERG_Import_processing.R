@@ -48,11 +48,15 @@ read_abf <- function(
   ...,
   add_stim = TRUE,
   calib = NULL,
+  protocol = (c("default", "C1", "C0")),
   nd_start = 3.0,
   nd_end = 6.0,
   nd_step = 0.5,
   repeats_per_level = 4,
   n_protocol_repeats = 10) {
+
+  # Listing Protocol
+  protocol <- match.arg(protocol)
 
   # Accept either a path or a zeus_abf_raw object
   raw_abf <- NULL
@@ -73,6 +77,7 @@ read_abf <- function(
     df_long <- add_stimulus_cols_protocol(
       df_long,
       calib = calib,
+      protocol = protocol,
       nd_start = nd_start,
       nd_end = nd_end,
       nd_step = nd_step,
@@ -187,7 +192,8 @@ nd_to_irradiance_log10 <- function(stim_nd, calib = NULL) {
 
 # Stimulus Schedule and irradiance mapping --------------------------------
 
-# Protocol: ND 3.0 to 6.0 by 0.5, each ND repeats 4 times, repeating the full sequence
+# Default Protocol:
+# ND 3.0 to 6.0 by 0.5, each ND repeats 4 times, repeated 10 times
 # 10 time = 280 sweeps
 make_stim_nd_sweep_protocol <- function(
     nd_start = 3.0,
@@ -202,19 +208,16 @@ make_stim_nd_sweep_protocol <- function(
   full
 }
 
-add_stimulus_cols_protocol <- function(
-    df_long,
-    calib = NULL,
+# C1 (White light):
+# same ND protocol as above, but wavelength is fixed at 570
+make_protocol_C1 <- function(
     nd_start = 3.0,
     nd_end = 6.0,
     nd_step = 0.5,
     repeats_per_level = 4,
-    n_protocol_repeats = 10) {
-  if (!requireNamespace("dplyr", quietly = TRUE)) stop("Need dplyr.", call. = FALSE)
-  if (!requireNamespace("tibble", quietly = TRUE)) stop("Need tibble.", call. = FALSE)
-
-  # Building protocol for ND schedule (length 280)
-  stim_nd_seq <- make_stim_nd_sweep_protocol(
+    n_protocol_repeats = 10
+) {
+  stim_nd <- make_stim_nd_sweep_protocol(
     nd_start = nd_start,
     nd_end = nd_end,
     nd_step = nd_step,
@@ -222,23 +225,124 @@ add_stimulus_cols_protocol <- function(
     n_protocol_repeats = n_protocol_repeats
   )
 
-  # Map protocol onto sweeps existing in data (keeping extra sweeps)
+  data.frame(
+    stim_nd = stim_nd,
+    wavelength = 570
+  )
+}
+
+
+# C0 (Spectral):
+# wavelength and ND
+make_protocol_C0 <- function() {
+
+  spectral_blocks <- list(
+    list(wavelength = 650, stim_nd = c(4.0, 3.5, 3.0, 2.5, 2.0, 1.5, 1.0, NA)),
+    list(wavelength = 570, stim_nd = c(5.0, 4.5, 4.0, 3.5, 3.0, 2.5, 2.0, NA)),
+    list(wavelength = 490, stim_nd = c(5.0, 4.5, 4.0, 3.5, 3.0, 2.5, 2.0, NA)),
+    list(wavelength = 410, stim_nd = c(5.0, 4.5, 4.0, 3.5, 3.0, 2.5, 2.0, NA)),
+    list(wavelength = 330, stim_nd = c(4.0, 3.5, 3.0, 2.5, 2.0, 1.5, 1.0, NA)),
+    list(wavelength = 650, stim_nd = c(4.5, 4.0, 3.5, 3.0, 2.5, 2.0, 1.5, NA)),
+    list(wavelength = 610, stim_nd = c(5.0, 4.5, 4.0, 3.5, 3.0, 2.5, 2.0, NA)),
+    list(wavelength = 530, stim_nd = c(5.0, 4.5, 4.0, 3.5, 3.0, 2.5, 2.0, NA)),
+    list(wavelength = 450, stim_nd = c(5.0, 4.5, 4.0, 3.5, 3.0, 2.5, 2.0, NA)),
+    list(wavelength = 370, stim_nd = c(5.0, 4.5, 4.0, 3.5, 3.0, 2.5, 2.0, NA))
+  )
+
+  out <- do.call(
+    rbind,
+    lapply(spectral_blocks, function(block) {
+      data.frame(
+        stim_nd = block$stim_nd,
+        wavelength = rep(block$wavelength, length(block$stim_nd))
+      )
+    })
+  )
+
+  rownames(out) <- NULL
+  out
+}
+
+
+# Helper to build protocol table
+make_protocol_table <- function(
+    protocol = c("default", "C1", "C0"),
+    nd_start = 3.0,
+    nd_end = 6.0,
+    nd_step = 0.5,
+    repeats_per_level = 4,
+    n_protocol_repeats = 10
+) {
+  protocol <- match.arg(protocol)
+
+  if (protocol == "default") {
+    data.frame(
+      stim_nd = make_stim_nd_sweep_protocol(
+        nd_start = nd_start,
+        nd_end = nd_end,
+        nd_step = nd_step,
+        repeats_per_level = repeats_per_level,
+        n_protocol_repeats = n_protocol_repeats
+      ),
+      wavelength = NA_real_
+    )
+  } else if (protocol == "C1") {
+    make_protocol_C1(
+      nd_start = nd_start,
+      nd_end = nd_end,
+      nd_step = nd_step,
+      repeats_per_level = repeats_per_level,
+      n_protocol_repeats = n_protocol_repeats
+    )
+  } else if (protocol == "C0") {
+    make_protocol_C0()
+  } else {
+    stop("Unsupported protocol: ", protocol, call. = FALSE)
+  }
+}
+
+# Adds stims to protocol
+add_stimulus_cols_protocol <- function(
+    df_long,
+    calib = NULL,
+    protocol = c("default", "C1", "C0"),
+    nd_start = 3.0,
+    nd_end = 6.0,
+    nd_step = 0.5,
+    repeats_per_level = 4,
+    n_protocol_repeats = 10
+) {
+  if (!requireNamespace("dplyr", quietly = TRUE)) stop("Need dplyr.", call. = FALSE)
+  if (!requireNamespace("tibble", quietly = TRUE)) stop("Need tibble.", call. = FALSE)
+
+  protocol <- match.arg(protocol)
+
+  protocol_tbl <- make_protocol_table(
+    protocol = protocol,
+    nd_start = nd_start,
+    nd_end = nd_end,
+    nd_step = nd_step,
+    repeats_per_level = repeats_per_level,
+    n_protocol_repeats = n_protocol_repeats
+  )
+
   sweeps_present <- sort(unique(df_long$sweep))
-  n_map <- min(length(sweeps_present), length(stim_nd_seq))
+  n_map <- min(length(sweeps_present), nrow(protocol_tbl))
 
   stim_tbl <- tibble::tibble(
     sweep = sweeps_present[seq_len(n_map)],
-    stim_nd = stim_nd_seq[seq_len(n_map)]) |>
-
+    stim_nd = protocol_tbl$stim_nd[seq_len(n_map)],
+    wavelength = protocol_tbl$wavelength[seq_len(n_map)]
+  ) |>
     dplyr::mutate(
-      stim_irradiance_log10 = nd_to_irradiance_log10(stim_nd, calib = calib)
+      stim_irradiance_log10 = dplyr::if_else(
+        is.na(stim_nd),
+        NA_real_,
+        nd_to_irradiance_log10(stim_nd, calib = calib)
+      )
     )
 
-  # Left join keeps all rows, any sweeps outside of protocol receive NA
-
   dplyr::left_join(df_long, stim_tbl, by = "sweep")
-
 }
-
 
 
