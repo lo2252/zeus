@@ -94,6 +94,41 @@ read_abf <- function(
   df_long
 }
 
+# Allowed Treatment values -----------------------------------------------------
+#' Allowed treatment group values
+#'
+#' Internal helper returning the controlled vocabulary of supported
+#' treatment group identifiers used in ZEUS metadata.
+#'
+#' @return A character vector of allowed treatment group labels.
+#' @keywords internal
+
+
+.allowed_treatment_groups <- function() {
+  c("SYS Water",
+    "BPA",
+    "DMSO",
+    "1-850",
+    "T3",
+    "ICI",
+    "EE2",
+    "BPA/ICI",
+    "BPA/1-850",
+    "BPA/1-850/ICI",
+    "user_input")
+}
+
+#' Allowed ERG age categories
+#'
+#' Internal helper returning the allowed age categories for ERG recordings.
+#'
+#' @return A character vector of allowed ERG age values.
+#' @keywords internal
+
+
+.allowed_erg_age <- function() {
+  c("Larval", "Adult")
+}
 
 # Convert to long DF -----------------------------------------------------------
 
