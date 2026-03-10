@@ -49,6 +49,13 @@ read_abf_raw <- function(path, ...) {
 #'   `"default"`, `"C1"`, `"C0"`.
 #' @param nd_start,nd_end,nd_step,repeats_per_level,n_protocol_repeats Protocol
 #'   settings used by `"default"` and `"C1"`. `"C0"` uses a fixed custom sequence.
+#' @param treatment_group Treatment label. One of `"SYS Water"`, `"BPA"`,
+#'   `"DMSO"`, `"1-850"`, `"T3"`, `"ICI"`, `"EE2"`, `"BPA/ICI"`,
+#'   `"BPA/1-850"`, `"BPA/1-850/ICI"`, or `"user_input"`.
+#' @param treatment_group_custom Character string used when
+#'   `treatment_group = "user_input"`.
+#' @param date_of_fertilization Date of fertilization for the fish.
+#' @param erg_age Age at ERG, one of `"larval"` or `"adult"`.
 #'
 #' @return A tibble/data.frame in standardized long format.
 #' @export
@@ -62,7 +69,11 @@ read_abf <- function(
     nd_end = 6.0,
     nd_step = 0.5,
     repeats_per_level = 4,
-    n_protocol_repeats = 10
+    n_protocol_repeats = 10,
+    treatment_group = NULL,
+    treatment_group_custom = NULL,
+    date_of_fertilization = NA,
+    erg_age = NULL
 ) {
   protocol <- match.arg(protocol)
 
@@ -80,20 +91,23 @@ read_abf <- function(
 
   if (isTRUE(add_stim)) {
     df_long <- add_stimulus_cols_protocol(
-      df_long = df_long,
-      calib = calib,
-      protocol = protocol,
-      nd_start = nd_start,
-      nd_end = nd_end,
-      nd_step = nd_step,
-      repeats_per_level = repeats_per_level,
-      n_protocol_repeats = n_protocol_repeats
+    df_long = df_long,
+    calib = calib,
+    protocol = protocol,
+    nd_start = nd_start,
+    nd_end = nd_end,
+    nd_step = nd_step,
+    repeats_per_level = repeats_per_level,
+    n_protocol_repeats = n_protocol_repeats,
+    treatment_group = treatment_group,
+    treatment_group_custom = treatment_group_custom,
+    date_of_fertilization = date_of_fertilization,
+    erg_age = erg_age
     )
   }
 
   df_long
 }
-
 
 # Convert to long DF -----------------------------------------------------------
 
@@ -356,6 +370,142 @@ make_protocol_table <- function(
   )
 }
 
+# Allowed Treatment values -----------------------------------------------------
+#' Allowed treatment group values
+#'
+#' Internal helper returning the controlled vocabulary of supported
+#' treatment group identifiers used in ZEUS metadata.
+#'
+#' @return A character vector of allowed treatment group labels.
+#' @keywords internal
+
+.allowed_treatment_groups <- function() {
+  c("SYS Water",
+    "BPA",
+    "DMSO",
+    "1-850",
+    "T3",
+    "ICI",
+    "EE2",
+    "BPA/ICI",
+    "BPA/1-850",
+    "BPA/1-850/ICI",
+    "user_input")
+}
+
+#' Allowed ERG age categories
+#'
+#' Internal helper returning the allowed age categories for ERG recordings.
+#'
+#' @return A character vector of allowed ERG age values.
+#' @keywords internal
+
+.allowed_erg_age <- function() {
+  c("Larval", "Adult")
+}
+
+
+# Treatment and Age Metadata Helper --------------------------------------------
+#' Construct sample-level metadata for ERG recordings
+#'
+#' Internal helper used to validate and construct meta data describing
+#' the sample associated with the ERG recording. This includes the treatment
+#' group identity, date of fertilization, and developmental stage at the time
+#' of ERG recording.
+#'
+#' Treatment groups are confirmed against a controlled list by
+#' `.allowed_treatment_grous()`. If `"user_input"` is specified, a custom
+#' treatment label must be provided via `treatment_group_custom`.
+#'
+#' ERG age is validated against `.allowed_erg_age()`.
+#'
+#' @param treatment_group Character string specifying treatment group.
+#'  Must be one of: `"SYS Water"`, `"BPA"`, `"DMSO"`, `"1-850"`, `"T3"`,
+#'   `"ICI"`, `"EE2"`, `"BPA/ICI"`, `"BPA/1-850"`, `"BPA/1-850/ICI"`,
+#'   or `"user_input"`.
+#'
+#' @param treatment_group_custom Character string used when `treatment_group`
+#'   = `"user_input"` to specify a custom treatment label.
+#'
+#' @param date_of_fertilization Date of fertilization for the fish. Accepts
+#' `Date` objects or date-like value, using `as.Date()` to coerce
+#' for the format.
+#'
+#' @param erg_date Character string describing developmental stage at the time
+#' of ERG recording. Must be `"larval"` or `"adult"`.
+#'
+#' @return A data frame containing validated sample metadata with columns:
+#' \describe{
+#'  \item{treatment_group}{Treatment group label.}
+#'  \item{date_of_fertilization}{Date of fertilization for the sample.}
+#'  \item{erg_age}{Developmental stage at ERG recording.}
+#'  }
+#' @keywords internal
+
+make_sample_metadata <- function(
+    treatment_group = NULL,
+    treatment_group_custom = NULL,
+    date_of_fertilization = NA,
+    erg_age = NULL){
+  allowed_treatments <- .allowed_treatment_groups()
+  allowed_ages <- .allowed_erg_age()
+
+  if (is.null(treatment_group)) {
+    treatment_group <- NA_character_
+  }
+  if (!is.na(treatment_group) && !treatment_group %in% allowed_treatments) {
+    stop(
+      "'treatment_group' must be one of: ",
+      paste(allowed_treatments, collapse = ", "),
+      call. = FALSE
+    )
+  }
+  if (identical(treatment_group, "user_input")) {
+    if (is.null(treatment_group_custom) || !nzchar(trimws(treatment_group_custom))) {
+      stop(
+        "When treatment_group = 'user_input', you must supply ",
+        "'treatment_group_custom'.",
+        call. = FALSE
+      )
+    }
+    treatment_group_final <- trimws(treatment_group_custom)
+  } else {
+    treatment_group_final <- treatment_group
+  }
+
+  if (is.null(erg_age)) {
+    erg_age <- NA_character_
+  }
+
+  if (!is.na(erg_age) && !erg_age %in% allowed_ages) {
+    stop(
+      "'erg_age' must be one of: ",
+      paste(allowed_ages, collapse = ", "),
+      call. = FALSE
+    )
+  }
+
+  if (!is.na(date_of_fertilization)) {
+    date_of_fertilization <- tryCatch(
+      as.Date(date_of_fertilization),
+      error = function(e) NA
+    )
+
+    if (is.na(date_of_fertilization)) {
+      stop(
+        "'date_of_fertilization' must be a valid Date or date-like value.",
+        call. = FALSE
+      )
+    }
+  }
+
+  data.frame(
+    treatment_group = treatment_group_final,
+    date_of_fertilization = date_of_fertilization,
+    erg_age = erg_age,
+    stringsAsFactors = FALSE
+  )
+}
 
 # Protocol joiner --------------------------------------------------------------
 
@@ -380,7 +530,11 @@ add_stimulus_cols_protocol <- function(
     nd_end = 6.0,
     nd_step = 0.5,
     repeats_per_level = 4,
-    n_protocol_repeats = 10
+    n_protocol_repeats = 10,
+    treatment_group = NULL,
+    treatment_group_custom = NULL,
+    date_of_fertilization = NA,
+    erg_age = NULL
 ) {
   if (!requireNamespace("dplyr", quietly = TRUE)) {
     stop("Package 'dplyr' is required.", call. = FALSE)
@@ -412,7 +566,43 @@ add_stimulus_cols_protocol <- function(
   ) |>
     dplyr::mutate(
       stim_irradiance_log10 = nd_to_irradiance_log10(stim_nd, calib = calib)
-    )
+    ) |>
+    dplyr::distinct(sweep, .keep_all = TRUE)
 
-  dplyr::left_join(df_long, stim_tbl, by = "sweep")
+  if (any(is.na(df_long$sweep))) {
+    stop("`df_long$sweep` contains NA values; cannot join safely.", call. = FALSE)
+  }
+
+  if (any(is.na(stim_tbl$sweep))) {
+    stop("`stim_tbl$sweep` contains NA values; cannot join safely.", call. = FALSE)
+  }
+
+  if (anyDuplicated(stim_tbl$sweep)) {
+    dupes <- stim_tbl$sweep[duplicated(stim_tbl$sweep)]
+    stop(
+      "Duplicate sweep values found in `stim_tbl`: ",
+      paste(unique(dupes), collapse = ", "),
+      call. = FALSE
+    )
+  }
+
+  sample_meta <- make_sample_metadata(
+    treatment_group = treatment_group,
+    treatment_group_custom = treatment_group_custom,
+    date_of_fertilization = date_of_fertilization,
+    erg_age = erg_age
+  )
+
+  df_long |>
+    dplyr::mutate(sweep = as.character(sweep)) |>
+    dplyr::left_join(
+      stim_tbl |> dplyr::mutate(sweep = as.character(sweep)),
+      by = "sweep",
+      relationship = "many-to-one"
+    ) |>
+    dplyr::mutate(
+      treatment_group = sample_meta$treatment_group,
+      date_of_fertilization = sample_meta$date_of_fertilization,
+      erg_age = sample_meta$erg_age
+    )
 }
