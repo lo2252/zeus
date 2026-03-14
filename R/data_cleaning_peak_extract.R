@@ -167,7 +167,119 @@ erg_extract_features <- function(df_long,
     time_max = b_window[2]) |>
     dplyr::filter(.data$point_type == "peak")
 
+  b_candidates <- a_summary |>
+    dplyr::left_join(
+      b_extrema,
+      by = c("sweep", "stim_nd", "stim_irradiance")) |>
 
+    dplyr::filter(
+      .data$time_ms > .data$a_wave_time_ms,
+      .data$amplitude_uv > 0) |>
+
+    dplyr::mutate(
+      b_wave_trough_to_peak_uv = .data$amplitude_uv - .data$a_wave_trough_uv) |>
+
+    dplyr::filter(
+      .data$b_wave_trough_to_peak_uv >= min_b_trough_to_peak_uv)
+
+  b_summary <- b_candidates |>
+    dplyr::group_by(dplyr::across(dplyr::all_of(group_keys))) |>
+    dplyr::slice_min(order_by = .date$time_ms, n = 1, with_ties = FALSE) |>
+    dplyr::ungroup() |>
+    dplyr::transmute(
+      .data$sweep,
+      .data$stim_nd,
+      .data$stim_irradiance,
+      b_wave_peak_uv = .data$amplitude_uv,
+      b_wave_time_ms = .data$time_ms,
+      b_wave_trough_to_peak_uv
+    )
+
+  # D-wave: Trough and peak within the d-wave interval
+  d_extrema <- erg_find_extrema(
+    df_long = df_joined,
+    time_col = ms,
+    value_col = response_uv,
+    group_cols = group_keys,
+    time_min = d_window[1],
+    time_max = d_window[2])
+
+  d_trough_summary <- d_extrema |>
+    dplyr::filter(.data$point_type == "trough") |>
+    dplyr::group_by(dplyr::across(dplyr::all_of(group_keys))) |>
+    dplyr::slice_min(order_by = .data$amplitude_uv, n = 1, with_ties = FALSE) |>
+    dplyr::ungroup() |>
+    dplyr::transmute(
+      .data$sweep,
+      .data$stim_nd,
+      .data$stim_irradiance,
+      d_wave_trough_uv = .data$amplitude_uv,
+      d_wave_trough_time_ms = .data$time_ms
+    )
+
+  d_peak_summary <- d_extrema |>
+    dplyr::filter(.data$point_type == "peak") |>
+    dplyr::group_by(dplyr::across(dplyr::all_of(group_keys))) |>
+    dplyr::slice_max(order_by = .data$amplitude_uv, n = 1, with_ties = FALSE) |>
+    dplyr::ungroup() |>
+    dplyr::transmute(
+      .data$sweep,
+      .data$stim_nd,
+      .data$stim_irradiance,
+      d_wave_peak_uv = .data$amplitude_uv,
+      d_wave_peak_time_ms = .data$time_ms
+    )
+
+  df_features <- a_summary |>
+    dplyr::left_join(b_summary, by = group_keys) %>%
+    dplyr::left_join(d_trough_summary, by = group_keys) %>%
+    dplyr::left_join(d_peak_summary, by = group_keys) %>%
+    dplyr::mutate(
+      b_wave_invalid =
+        is.na(.data$b_wave_peak_uv) |
+        is.na(.data$b_wave_time_ms) |
+        is.na(.data$a_wave_time_ms) |
+        is.na(.data$b_wave_trough_to_peak_uv) |
+        .data$b_wave_peak_uv < 0 |
+        .data$a_wave_time_ms > .data$b_wave_time_ms |
+        .data$b_wave_time_ms < 0 |
+        .data$b_wave_trough_to_peak_uv < min_b_trough_to_peak_uv,
+
+      b_wave_peak_uv = dplyr::if_else(
+        .data$b_wave_invalid,
+        NA_real_,
+        .data$b_wave_peak_uv
+      ),
+      b_wave_time_ms = dplyr::if_else(
+        .data$b_wave_invalid,
+        NA_real_,
+        .data$b_wave_time_ms
+      ),
+      b_wave_trough_to_peak_uv = dplyr::if_else(
+        .data$b_wave_invalid,
+        NA_real_,
+        .data$b_wave_trough_to_peak_uv
+      ),
+
+      d_wave_trough_to_peak_uv = .data$d_wave_peak_uv - .data$d_wave_trough_uv
+    ) %>%
+    dplyr::select(
+      .data$sweep,
+      .data$stim_nd,
+      .data$stim_irradiance,
+      .data$a_wave_trough_uv,
+      .data$a_wave_time_ms,
+      .data$b_wave_peak_uv,
+      .data$b_wave_time_ms,
+      .data$b_wave_trough_to_peak_uv,
+      .data$d_wave_trough_uv,
+      .data$d_wave_trough_time_ms,
+      .data$d_wave_peak_uv,
+      .data$d_wave_peak_time_ms,
+      .data$d_wave_trough_to_peak_uv
+    )
+
+  df_features
 }
 
 
