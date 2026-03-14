@@ -55,7 +55,7 @@ read_abf_raw <- function(path, ...) {
 #' @param treatment_group_custom Character string used when
 #'   `treatment_group = "user_input"`.
 #' @param date_of_fertilization Date of fertilization for the fish.
-#' @param erg_age Age at ERG, one of `"larval"` or `"adult"`.
+#' @param erg_age Age at ERG, one of `"Larval"` or `"Adult"`.
 #'
 #' @return A tibble/data.frame in standardized long format.
 #' @export
