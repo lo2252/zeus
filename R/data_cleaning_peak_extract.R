@@ -58,6 +58,116 @@ erg_find_extrema <- function(df_long,
     dplyr::ungroup()
 }
 
+#' Extract sequence-based ERG trough-to-peak features
+#'
+#' Creates a sweep-level ERG feature table using a biologically ordered sequence:
+#' a-wave trough, then b-wave peak after the a-wave, then d-wave trough and peak
+#' in the d-wave interval.
+#'
+#' The function is centered on trough-to-peak measurements. It returns:
+#' \itemize{
+#'  \item a-wave trough amplitude and time
+#'   \item b-wave peak amplitude and time
+#'   \item b-wave trough-to-peak amplitude (a-wave trough to b-wave peak)
+#'   \item d-wave trough amplitude and time
+#'   \item d-wave peak amplitude and time
+#'   \item d-wave trough-to-peak amplitude
+#' }
+#'
+#'  B-wave values are set to `NA` when any of the following conditions are met:
+#' \itemize{
+#'   \item b-wave peak amplitude is negative
+#'   \item a-wave time occurs after b-wave time
+#'   \item b-wave time is negative
+#'   \item b-wave trough-to-peak amplitude is smaller than
+#'         `min_b_trough_to_peak_uv`
+#' }
+#'
+#' To reduce noisy false-positive b-waves, the b-wave is chosen as the first
+#' peak after the a-wave trough that is positive and meets the minimum
+#' trough-to-peak criterion.
+#'
+#' If `stim_nd` and `stim_irradiance` are not already present in `df_long`,
+#' they may be supplied through `stim_calib` and joined by `sweep`.
+#'
+#' @param df_long A long-format data frame containing at minimum
+#'   `sweep`, `ms`, and `response_uv`.
+#' @param stim_calib Optional data frame containing `sweep`, `stim_nd`,
+#'   and `stim_irradiance`.
+#' @param a_window Numeric length-2 vector for the a-wave interval.
+#' @param b_window Numeric length-2 vector for the b-wave interval.
+#' @param d_window Numeric length-2 vector for the d-wave interval.
+#' @param min_b_trough_to_peak_uv Minimum allowed trough-to-peak amplitude for
+#'   the b-wave candidate.
+#'
+#' @return A tibble with one row per sweep.
+#'
+#' @examples
+#' \dontrun{
+#' df_features <- erg_extract_features(
+#'   df_long = df_long_stim,
+#'   min_b_trough_to_peak_uv = 5)
+#' }
+#'
+#' @export
+erg_extract_features <- function(df_long,
+                                 stim_calib = NULL,
+                                 a_window = c(400, 550),
+                                 b_window = c(550, 700),
+                                 d_window = c(700, 1000),
+                                 min_b_trough_to_peak_uv = 5) {
 
+  df_joined <- df_long
+
+  if (!all(c("stim_nd", "stim_irradiance") %in% names(df_joined))) {
+    if (is.null(stim_calib)) {
+      stop(
+        "df_long must contain 'stim_nd' and 'stim_irradiance', or ",
+        "'stim_calib' must be supplied.",
+        call. = FALSE
+      )
+    }
+
+    df_joined <- dplyr::left_join(df_joined, stim_calib, by = "sweep")
+  }
+
+  group_key <- c("sweep", "stim_nd", "stim_irradiance")
+
+  # A-wave: main trough in the a-wave interval
+  a_extrema <- erg_find_extrema(
+    df_long = df_joined,
+    time_col = ms,
+    value_col = response_uv,
+    group_cols = group_keys,
+    time_min = a_window[1],
+    time_max = a_window[2]
+  ) |>
+    dplyr::filter(.data$point_type == "trough")
+
+  a_summary <- a_extrema |>
+    dplyr::group_by(dplyr::across(dplyr::all_of(group_keys))) |>
+    dplyr::slice_min(order_by = .data$amplitude_uv, n = 1, with_ties = FALSE) |>
+    dplyr::ungroup() |>
+    dplyr::transmute(
+      .data$sweep,
+      .data$stim_nd,
+      .data$stim_irradiance,
+      a_wave_trough_uv = .data$amplitude_uv,
+      a_wave_time_ms = .data$time_ms
+    )
+
+  # B-wave: first valid positive peak after a-wave that meets the
+  # minimum trough-to-peak threshold
+  b_extrema <- erg_find_extrema(
+    df_long = df_joined,
+    time_col = ms,
+    value_col = response_uv,
+    group_cols = group_keys,
+    time_min = b_window[1],
+    time_max = b_window[2]) |>
+    dplyr::filter(.data$point_type == "peak")
+
+
+}
 
 
