@@ -14,12 +14,12 @@
 #'
 #' @return A tibble of detected extrema.
 #' @export
-erg_find_extrema <- function(df_long,
-                             time_col = time_ms,
-                             value_col = value,
-                             group_cols = c("sweep"),
-                             time_min = NULL,
-                             time_max = NULL) {
+zeus_find_extrema <- function(df_long,
+                              time_col = time,
+                              value_col = value,
+                              group_cols = c("sweep"),
+                              time_min = NULL,
+                              time_max = NULL) {
 
   time_col <- rlang::enquo(time_col)
   value_col <- rlang::enquo(value_col)
@@ -62,16 +62,17 @@ erg_find_extrema <- function(df_long,
     dplyr::filter(!is.na(.data$point_type)) |>
     dplyr::ungroup() |>
     dplyr::mutate(
-      time_ms = !!time_col,
+      time = !!time_col,
       amplitude_uv = !!value_col
     ) |>
     dplyr::select(
       dplyr::all_of(group_cols),
-      .data$time_ms,
+      .data$time,
       .data$amplitude_uv,
       .data$point_type
     )
 }
+
 
 #' Creates a sweep-level ERG feature table from ZEUS long-format data using a
 #' biologically ordered sequence:
@@ -81,13 +82,9 @@ erg_find_extrema <- function(df_long,
 #'   \item d-wave trough and d-wave peak after that trough
 #' }
 #'
-#' This function is centered on trough-to-peak measurements and is compatible
-#' with the output of `read_abf()` / `abf_as_df_long()` /
-#' `add_stimulus_cols_protocol()`.
-#'
-#' Time windows are supplied in milliseconds, but the imported ZEUS long-format
-#' file stores time in seconds; the function converts time to milliseconds
-#' internally.
+#' This function keeps `time` in the same units as supplied in `df_long`.
+#' Because of that, `a_window`, `b_window`, and `d_window` must be given in the
+#' same units as `df_long$time`.
 #'
 #' B-wave values are set to `NA` when any of the following conditions are met:
 #' \itemize{
@@ -110,9 +107,12 @@ erg_find_extrema <- function(df_long,
 #' @param channel_filter Optional single channel name to analyze. If `NULL`,
 #'   all rows are used. If your long data contains multiple channels, you should
 #'   usually supply this.
-#' @param a_window Numeric length-2 vector giving the a-wave interval in ms.
-#' @param b_window Numeric length-2 vector giving the b-wave interval in ms.
-#' @param d_window Numeric length-2 vector giving the d-wave interval in ms.
+#' @param a_window Numeric length-2 vector giving the a-wave interval in the
+#'   same units as `df_long$time`.
+#' @param b_window Numeric length-2 vector giving the b-wave interval in the
+#'   same units as `df_long$time`.
+#' @param d_window Numeric length-2 vector giving the d-wave interval in the
+#'   same units as `df_long$time`.
 #' @param min_b_trough_to_peak_uv Minimum allowed trough-to-peak amplitude for
 #'   the b-wave candidate.
 #' @param min_d_trough_to_peak_uv Minimum allowed trough-to-peak amplitude for
@@ -121,13 +121,13 @@ erg_find_extrema <- function(df_long,
 #' @return A tibble with one row per sweep.
 #'
 #' @export
-erg_extract_features <- function(df_long,
-                                 channel_filter = NULL,
-                                 a_window = c(400, 550),
-                                 b_window = c(550, 700),
-                                 d_window = c(700, 1000),
-                                 min_b_trough_to_peak_uv = 5,
-                                 min_d_trough_to_peak_uv = 5) {
+zeus_extract_features <- function(df_long,
+                                  channel_filter = NULL,
+                                  a_window = c(0.4, 0.7),
+                                  b_window = c(0.4, 0.7),
+                                  d_window = c(0.7, 1.0),
+                                  min_b_trough_to_peak_uv = 5,
+                                  min_d_trough_to_peak_uv = 5) {
 
   required_cols <- c(
     "sweep", "time", "value", "stim_nd", "stim_irradiance_log10"
@@ -166,12 +166,27 @@ erg_extract_features <- function(df_long,
     }
   }
 
-  df_work <- df_work |>
-    dplyr::mutate(
-      time_ms = .data$time * 1000
-    )
+  group_keys <- c("sweep")
 
-  group_keys <- c("sweep", "stim_nd", "stim_irradiance_log10")
+  if ("channel" %in% names(df_work)) {
+    group_keys <- c(group_keys, "channel")
+  }
+
+  if ("stim_order" %in% names(df_work)) {
+    group_keys <- c(group_keys, "stim_order")
+  }
+
+  if ("stim_type" %in% names(df_work)) {
+    group_keys <- c(group_keys, "stim_type")
+  }
+
+  if ("stim_nd" %in% names(df_work)) {
+    group_keys <- c(group_keys, "stim_nd")
+  }
+
+  if ("stim_irradiance_log10" %in% names(df_work)) {
+    group_keys <- c(group_keys, "stim_irradiance_log10")
+  }
 
   if ("wavelength" %in% names(df_work)) {
     group_keys <- c(group_keys, "wavelength")
@@ -189,10 +204,9 @@ erg_extract_features <- function(df_long,
     group_keys <- c(group_keys, "erg_age")
   }
 
-  # A-wave: most negative trough in a-wave interval
-  a_extrema <- erg_find_extrema(
+  a_extrema <- zeus_find_extrema(
     df_long = df_work,
-    time_col = time_ms,
+    time_col = time,
     value_col = value,
     group_cols = group_keys,
     time_min = a_window[1],
@@ -207,13 +221,12 @@ erg_extract_features <- function(df_long,
     dplyr::transmute(
       dplyr::across(dplyr::all_of(group_keys)),
       a_wave_trough_uv = .data$amplitude_uv,
-      a_wave_time_ms = .data$time_ms
+      a_wave_time = .data$time
     )
 
-  # B-wave: first valid positive peak after a-wave trough with minimum TTP
-  b_extrema <- erg_find_extrema(
+  b_extrema <- zeus_find_extrema(
     df_long = df_work,
-    time_col = time_ms,
+    time_col = time,
     value_col = value,
     group_cols = group_keys,
     time_min = b_window[1],
@@ -227,7 +240,7 @@ erg_extract_features <- function(df_long,
       by = group_keys
     ) |>
     dplyr::filter(
-      .data$time_ms > .data$a_wave_time_ms,
+      .data$time > .data$a_wave_time,
       .data$amplitude_uv > 0
     ) |>
     dplyr::mutate(
@@ -239,19 +252,18 @@ erg_extract_features <- function(df_long,
 
   b_summary <- b_candidates |>
     dplyr::group_by(dplyr::across(dplyr::all_of(group_keys))) |>
-    dplyr::slice_min(order_by = .data$time_ms, n = 1, with_ties = FALSE) |>
+    dplyr::slice_min(order_by = .data$time, n = 1, with_ties = FALSE) |>
     dplyr::ungroup() |>
     dplyr::transmute(
       dplyr::across(dplyr::all_of(group_keys)),
       b_wave_peak_uv = .data$amplitude_uv,
-      b_wave_time_ms = .data$time_ms,
+      b_wave_time = .data$time,
       b_wave_trough_to_peak_uv = .data$b_wave_trough_to_peak_uv
     )
 
-  # D-wave: trough first, then first valid peak after trough
-  d_extrema <- erg_find_extrema(
+  d_extrema <- zeus_find_extrema(
     df_long = df_work,
-    time_col = time_ms,
+    time_col = time,
     value_col = value,
     group_cols = group_keys,
     time_min = d_window[1],
@@ -266,7 +278,7 @@ erg_extract_features <- function(df_long,
     dplyr::transmute(
       dplyr::across(dplyr::all_of(group_keys)),
       d_wave_trough_uv = .data$amplitude_uv,
-      d_wave_trough_time_ms = .data$time_ms
+      d_wave_trough_time = .data$time
     )
 
   d_peak_candidates <- d_trough_summary |>
@@ -276,7 +288,7 @@ erg_extract_features <- function(df_long,
       by = group_keys
     ) |>
     dplyr::filter(
-      .data$time_ms > .data$d_wave_trough_time_ms
+      .data$time > .data$d_wave_trough_time
     ) |>
     dplyr::mutate(
       d_wave_trough_to_peak_uv = .data$amplitude_uv - .data$d_wave_trough_uv
@@ -287,12 +299,12 @@ erg_extract_features <- function(df_long,
 
   d_peak_summary <- d_peak_candidates |>
     dplyr::group_by(dplyr::across(dplyr::all_of(group_keys))) |>
-    dplyr::slice_min(order_by = .data$time_ms, n = 1, with_ties = FALSE) |>
+    dplyr::slice_min(order_by = .data$time, n = 1, with_ties = FALSE) |>
     dplyr::ungroup() |>
     dplyr::transmute(
       dplyr::across(dplyr::all_of(group_keys)),
       d_wave_peak_uv = .data$amplitude_uv,
-      d_wave_peak_time_ms = .data$time_ms,
+      d_wave_peak_time = .data$time,
       d_wave_trough_to_peak_uv = .data$d_wave_trough_to_peak_uv
     )
 
@@ -303,12 +315,12 @@ erg_extract_features <- function(df_long,
     dplyr::mutate(
       b_wave_invalid =
         is.na(.data$b_wave_peak_uv) |
-        is.na(.data$b_wave_time_ms) |
-        is.na(.data$a_wave_time_ms) |
+        is.na(.data$b_wave_time) |
+        is.na(.data$a_wave_time) |
         is.na(.data$b_wave_trough_to_peak_uv) |
         .data$b_wave_peak_uv < 0 |
-        .data$a_wave_time_ms > .data$b_wave_time_ms |
-        .data$b_wave_time_ms < 0 |
+        .data$a_wave_time > .data$b_wave_time |
+        .data$b_wave_time < 0 |
         .data$b_wave_trough_to_peak_uv < min_b_trough_to_peak_uv,
 
       b_wave_peak_uv = dplyr::if_else(
@@ -316,10 +328,10 @@ erg_extract_features <- function(df_long,
         NA_real_,
         .data$b_wave_peak_uv
       ),
-      b_wave_time_ms = dplyr::if_else(
+      b_wave_time = dplyr::if_else(
         .data$b_wave_invalid,
         NA_real_,
-        .data$b_wave_time_ms
+        .data$b_wave_time
       ),
       b_wave_trough_to_peak_uv = dplyr::if_else(
         .data$b_wave_invalid,
@@ -330,14 +342,14 @@ erg_extract_features <- function(df_long,
     dplyr::select(
       dplyr::all_of(group_keys),
       .data$a_wave_trough_uv,
-      .data$a_wave_time_ms,
+      .data$a_wave_time,
       .data$b_wave_peak_uv,
-      .data$b_wave_time_ms,
+      .data$b_wave_time,
       .data$b_wave_trough_to_peak_uv,
       .data$d_wave_trough_uv,
-      .data$d_wave_trough_time_ms,
+      .data$d_wave_trough_time,
       .data$d_wave_peak_uv,
-      .data$d_wave_peak_time_ms,
+      .data$d_wave_peak_time,
       .data$d_wave_trough_to_peak_uv
     )
 
