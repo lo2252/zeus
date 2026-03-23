@@ -59,7 +59,7 @@ read_abf_raw <- function(path, ...) {
 #'
 #' @return A tibble/data.frame in standardized long format.
 #' @export
-read_abf <- function(
+zeus_import <- function(
     x,
     ...,
     add_stim = TRUE,
