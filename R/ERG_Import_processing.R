@@ -55,7 +55,7 @@ read_abf_raw <- function(path, ...) {
 #' @param treatment_group_custom Character string used when
 #'   `treatment_group = "user_input"`.
 #' @param date_of_fertilization Date of fertilization for the fish.
-#' @param erg_age Age at ERG, one of `"larval"` or `"adult"`.
+#' @param erg_age Age at ERG, one of `"Larval"` or `"Adult"`.
 #'
 #' @return A tibble/data.frame in standardized long format.
 #' @export
@@ -440,19 +440,22 @@ make_protocol_table <- function(
 #'  \item{date_of_fertilization}{Date of fertilization for the sample.}
 #'  \item{erg_age}{Developmental stage at ERG recording.}
 #'  }
+#' @importFrom lubridate mdy
 #' @keywords internal
 
 make_sample_metadata <- function(
     treatment_group = NULL,
     treatment_group_custom = NULL,
     date_of_fertilization = NA,
-    erg_age = NULL){
+    erg_age = NULL
+) {
   allowed_treatments <- .allowed_treatment_groups()
   allowed_ages <- .allowed_erg_age()
 
   if (is.null(treatment_group)) {
     treatment_group <- NA_character_
   }
+
   if (!is.na(treatment_group) && !treatment_group %in% allowed_treatments) {
     stop(
       "'treatment_group' must be one of: ",
@@ -460,6 +463,7 @@ make_sample_metadata <- function(
       call. = FALSE
     )
   }
+
   if (identical(treatment_group, "user_input")) {
     if (is.null(treatment_group_custom) || !nzchar(trimws(treatment_group_custom))) {
       stop(
@@ -485,18 +489,28 @@ make_sample_metadata <- function(
     )
   }
 
-  if (!is.na(date_of_fertilization)) {
-    date_of_fertilization <- tryCatch(
-      as.Date(date_of_fertilization),
-      error = function(e) NA
-    )
+  if (is.null(date_of_fertilization) || length(date_of_fertilization) == 0) {
+    date_of_fertilization <- as.Date(NA)
+  } else if (inherits(date_of_fertilization, "Date")) {
+    # leave as-is
+  } else if (is.character(date_of_fertilization)) {
+    date_of_fertilization <- lubridate::mdy(date_of_fertilization, quiet = TRUE)
 
     if (is.na(date_of_fertilization)) {
       stop(
-        "'date_of_fertilization' must be a valid Date or date-like value.",
+        "'date_of_fertilization' must be a valid date in month/day/year format ",
+        "(e.g., '03/23/2026') or a Date object.",
         call. = FALSE
       )
     }
+  } else if (is.na(date_of_fertilization)) {
+    date_of_fertilization <- as.Date(NA)
+  } else {
+    stop(
+      "'date_of_fertilization' must be NA, a Date object, or a character string ",
+      "in month/day/year format.",
+      call. = FALSE
+    )
   }
 
   data.frame(
