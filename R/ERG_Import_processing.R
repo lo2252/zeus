@@ -38,9 +38,10 @@ read_abf_raw <- function(path, ...) {
 
 
 #' Read an ABF file and return a standardized long data frame
+#'
 #' @param x Either a file path to a .abf, or a `zeus_abf_raw` object.
 #' @param ... Passed to readABF::readABF() only when `x` is a file path.
-#' @param add_stim Logical; attach protocol stimulus columns
+#' @param add_stim Logical; attach protocol stimulus columns?
 #' @param calib Optional calibration table passed to nd_to_irradiance_log10().
 #' @param protocol Character string specifying the protocol. Supported:
 #'   `"default"`, `"C1"`, `"C0"`.
@@ -56,14 +57,13 @@ read_abf_raw <- function(path, ...) {
 #' @param apply_boxcar Logical; if `TRUE`, applies a boxcar filter to selected
 #'   response channels before stimulus annotation.
 #' @param boxcar_channel_pattern Character string used to identify the channel
-#'   to smooth. Default is `"DAM80"`, which will match channel names containing
-#'   `"DAM80"` such as `"ERG DAM80"`.
-#' @param boxcar_k Integer window size for the centered moving-average
-#'   boxcar filter. Must be at least 1. A value of 1 leaves the signal
-#'   unchanged.
+#'   to smooth. Default is `"DAM80"`.
+#' @param boxcar_k Optional integer window size for the boxcar filter. If not
+#'   supplied, `boxcar_width` is used to determine the window size.
+#' @param boxcar_width Optional numeric smoothing width in the same units as
+#'   the `time` column. Used only when `boxcar_k` is `NULL`.
 #' @param keep_raw_boxcar Logical; if `TRUE`, stores the original unsmoothed
-#'   signal in a new column called `value_raw` before replacing `value` with the
-#'   filtered signal.
+#'   signal in a new column called `value_raw`.
 #'
 #' @return A tibble/data.frame in standardized long format.
 #' @export
@@ -84,7 +84,8 @@ zeus_import <- function(
     erg_age = NULL,
     apply_boxcar = FALSE,
     boxcar_channel_pattern = "DAM80",
-    boxcar_k = 5,
+    boxcar_k = NULL,
+    boxcar_width = NULL,
     keep_raw_boxcar = FALSE
 ) {
 
@@ -100,12 +101,17 @@ zeus_import <- function(
 
   df_long <- abf_as_df_long(raw_abf)
 
-
   if (isTRUE(apply_boxcar)) {
+
+    if (is.null(boxcar_k) && is.null(boxcar_width)) {
+      boxcar_width <- 0.002
+    }
+
     df_long <- zeus_boxcar_filter(
       df_long = df_long,
       channel_pattern = boxcar_channel_pattern,
       k = boxcar_k,
+      boxcar_width = boxcar_width,
       keep_raw = keep_raw_boxcar
     )
   }
@@ -129,85 +135,6 @@ zeus_import <- function(
 
   df_long
 }
-
-# Boxcar Filter -----------------------------------------------------------
-
-#' Apply a boxcar filter to selected channels in long-format ABF data
-#'
-#' Applies a centered moving-average (boxcar) filter to the `value` column
-#' within each sweep for channels matching `channel_pattern`.
-#'
-#' @param df_long Long-format ABF data.
-#' @param channel_pattern Character string identifying channel to smooth.
-#' @param k Integer window size.
-#' @param keep_raw Logical; keep original signal in `value_raw`.
-#'
-#' @return Data frame with smoothed `value`.
-#' @keywords internal
-zeus_boxcar_filter <- function(df_long,
-                               channel_pattern = "DAM80",
-                               k = 5,
-                               keep_raw = FALSE) {
-
-  required_cols <- c("sweep", "time", "channel", "value")
-  missing_cols <- setdiff(required_cols, names(df_long))
-
-  if (length(missing_cols) > 0) {
-    stop(
-      "df_long is missing required columns: ",
-      paste(missing_cols, collapse = ", "),
-      call. = FALSE
-    )
-  }
-
-  if (!is.numeric(k) || length(k) != 1 || k < 1) {
-    stop("`k` must be a single integer >= 1.", call. = FALSE)
-  }
-
-  k <- as.integer(k)
-
-  if (isTRUE(keep_raw) && !"value_raw" %in% names(df_long)) {
-    df_long$value_raw <- df_long$value
-  }
-
-  idx <- grepl(channel_pattern, df_long$channel)
-
-  if (!any(idx)) return(df_long)
-
-  df_target <- df_long[idx, , drop = FALSE]
-  df_other  <- df_long[!idx, , drop = FALSE]
-
-  split_groups <- split(
-    df_target,
-    interaction(df_target$sweep, df_target$channel, drop = TRUE)
-  )
-
-  filtered_groups <- lapply(split_groups, function(dat) {
-    dat <- dat[order(dat$time), , drop = FALSE]
-
-    filt <- stats::filter(
-      dat$value,
-      rep(1 / k, k),
-      sides = 2
-    )
-
-    filt <- as.numeric(filt)
-
-    # Fill edges so no NA propagation
-    na_idx <- is.na(filt)
-    filt[na_idx] <- dat$value[na_idx]
-
-    dat$value <- filt
-    dat
-  })
-
-  out <- do.call(rbind, c(filtered_groups, list(df_other)))
-  out <- out[order(out$sweep, out$channel, out$time), ]
-  rownames(out) <- NULL
-
-  out
-}
-
 # Convert to long DF -----------------------------------------------------------
 
 #' Convert readABF output to a standardized long data frame
@@ -234,7 +161,7 @@ abf_as_df_long <- function(raw_abf) {
     time <- (seq_len(npts) - 1) * dt
 
     tibble::tibble(
-      sweep = s,
+      sweep = as.integer(s),
       time = rep(time, times = ncol(m)),
       channel = rep(ch_names, each = npts),
       units = rep(ch_units, each = npts),
@@ -242,7 +169,6 @@ abf_as_df_long <- function(raw_abf) {
     )
   })
 }
-
 
 # Convert to wide DF -----------------------------------------------------------
 
@@ -280,6 +206,128 @@ abf_as_df_wide <- function(raw_abf) {
   })
 }
 
+
+# Boxcar filter -----------------------------------------------------------
+
+#' Apply a boxcar filter to selected channels in long-format ABF data
+#'
+#' Applies a centered moving-average (boxcar) filter to the `value` column
+#' within each sweep for channels matching `channel_pattern`.
+#'
+#' @param df_long Long-format ABF data.
+#' @param channel_pattern Character string identifying channel to smooth.
+#' @param k Optional integer window size for the filter. If `NULL`, `k` is
+#'   computed from `boxcar_width` and the spacing in `time`.
+#' @param boxcar_width Optional numeric smoothing width in the same units as
+#'   `df_long$time`. Used only when `k` is `NULL`.
+#' @param keep_raw Logical; if `TRUE`, store original signal in `value_raw`.
+#'
+#' @return Data frame with smoothed `value`.
+#' @keywords internal
+zeus_boxcar_filter <- function(df_long,
+                               channel_pattern = "DAM80",
+                               k = NULL,
+                               boxcar_width = NULL,
+                               keep_raw = FALSE) {
+
+  required_cols <- c("sweep", "time", "channel", "value")
+  missing_cols <- setdiff(required_cols, names(df_long))
+
+  if (length(missing_cols) > 0) {
+    stop(
+      "df_long is missing required columns: ",
+      paste(missing_cols, collapse = ", "),
+      call. = FALSE
+    )
+  }
+
+  if (is.null(k)) {
+    if (is.null(boxcar_width) || !is.numeric(boxcar_width) ||
+        length(boxcar_width) != 1 || is.na(boxcar_width) || boxcar_width <= 0) {
+      stop(
+        "When `k` is NULL, `boxcar_width` must be a single numeric value > 0.",
+        call. = FALSE
+      )
+    }
+
+    unique_time <- sort(unique(df_long$time))
+
+    if (length(unique_time) < 2) {
+      stop(
+        "Not enough unique time points to estimate sampling interval.",
+        call. = FALSE
+      )
+    }
+
+    dt <- stats::median(diff(unique_time), na.rm = TRUE)
+
+    if (!is.finite(dt) || dt <= 0) {
+      stop(
+        "Could not determine a valid sampling interval from `time`.",
+        call. = FALSE
+      )
+    }
+
+    k <- as.integer(round(boxcar_width / dt))
+    k <- max(1L, k)
+
+    if (k %% 2 == 0) {
+      k <- k + 1L
+    }
+  } else {
+    if (!is.numeric(k) || length(k) != 1 || is.na(k) || k < 1) {
+      stop("`k` must be a single integer >= 1.", call. = FALSE)
+    }
+
+    k <- as.integer(k)
+
+    if (k %% 2 == 0) {
+      k <- k + 1L
+    }
+  }
+
+  if (isTRUE(keep_raw) && !"value_raw" %in% names(df_long)) {
+    df_long$value_raw <- df_long$value
+  }
+
+  idx <- grepl(channel_pattern, df_long$channel)
+
+  if (!any(idx)) {
+    return(df_long)
+  }
+
+  df_target <- df_long[idx, , drop = FALSE]
+  df_other  <- df_long[!idx, , drop = FALSE]
+
+  split_groups <- split(
+    df_target,
+    interaction(df_target$sweep, df_target$channel, drop = TRUE)
+  )
+
+  filtered_groups <- lapply(split_groups, function(dat) {
+    dat <- dat[order(dat$time), , drop = FALSE]
+
+    filt <- stats::filter(
+      dat$value,
+      rep(1 / k, k),
+      sides = 2
+    )
+
+    filt <- as.numeric(filt)
+
+    na_idx <- is.na(filt)
+    filt[na_idx] <- dat$value[na_idx]
+
+    dat$value <- filt
+    dat
+  })
+
+  out <- do.call(rbind, c(filtered_groups, list(df_other)))
+  out <- out[order(out$sweep, out$channel, out$time), , drop = FALSE]
+  rownames(out) <- NULL
+
+  out
+}
 
 # Calibration table ------------------------------------------------------------
 
@@ -667,7 +715,7 @@ add_stimulus_cols_protocol <- function(
     n_protocol_repeats = n_protocol_repeats
   )
 
-  sweeps_present <- sort(unique(df_long$sweep))
+  sweeps_present <- sort(unique(as.integer(df_long$sweep)))
   n_map <- min(length(sweeps_present), nrow(protocol_tbl))
 
   stim_tbl <- tibble::tibble(
@@ -707,9 +755,9 @@ add_stimulus_cols_protocol <- function(
   )
 
   df_long |>
-    dplyr::mutate(sweep = as.character(sweep)) |>
+    dplyr::mutate(sweep = as.integer(.data$sweep)) |>
     dplyr::left_join(
-      stim_tbl |> dplyr::mutate(sweep = as.character(sweep)),
+      stim_tbl,
       by = "sweep",
       relationship = "many-to-one"
     ) |>
@@ -717,5 +765,6 @@ add_stimulus_cols_protocol <- function(
       treatment_group = sample_meta$treatment_group,
       date_of_fertilization = sample_meta$date_of_fertilization,
       erg_age = sample_meta$erg_age
-    )
+    ) |>
+    dplyr::filter(!is.na(.data$stim_nd))
 }
