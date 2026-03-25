@@ -161,7 +161,7 @@ abf_as_df_long <- function(raw_abf) {
     time <- (seq_len(npts) - 1) * dt
 
     tibble::tibble(
-      sweep = s,
+      sweep = as.integer(s),
       time = rep(time, times = ncol(m)),
       channel = rep(ch_names, each = npts),
       units = rep(ch_units, each = npts),
@@ -169,7 +169,6 @@ abf_as_df_long <- function(raw_abf) {
     )
   })
 }
-
 
 # Convert to wide DF -----------------------------------------------------------
 
@@ -716,7 +715,7 @@ add_stimulus_cols_protocol <- function(
     n_protocol_repeats = n_protocol_repeats
   )
 
-  sweeps_present <- sort(unique(df_long$sweep))
+  sweeps_present <- sort(unique(as.integer(df_long$sweep)))
   n_map <- min(length(sweeps_present), nrow(protocol_tbl))
 
   stim_tbl <- tibble::tibble(
@@ -756,9 +755,9 @@ add_stimulus_cols_protocol <- function(
   )
 
   df_long |>
-    dplyr::mutate(sweep = as.character(sweep)) |>
+    dplyr::mutate(sweep = as.integer(.data$sweep)) |>
     dplyr::left_join(
-      stim_tbl |> dplyr::mutate(sweep = as.character(sweep)),
+      stim_tbl,
       by = "sweep",
       relationship = "many-to-one"
     ) |>
@@ -766,5 +765,6 @@ add_stimulus_cols_protocol <- function(
       treatment_group = sample_meta$treatment_group,
       date_of_fertilization = sample_meta$date_of_fertilization,
       erg_age = sample_meta$erg_age
-    )
+    ) |>
+    dplyr::filter(!is.na(.data$stim_nd))
 }
