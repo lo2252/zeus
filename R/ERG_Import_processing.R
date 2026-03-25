@@ -47,6 +47,8 @@ read_abf_raw <- function(path, ...) {
 #'   `"default"`, `"C1"`, `"C0"`.
 #' @param nd_start,nd_end,nd_step,repeats_per_level,n_protocol_repeats Protocol
 #'   settings used by `"default"` and `"C1"`. `"C0"` uses a fixed custom sequence.
+#' @param nd_descending Logical; if `TRUE`, default/C1 ND levels are assigned
+#'   from highest ND to lowest ND within each protocol repeat.
 #' @param treatment_group Treatment label. One of `"SYS Water"`, `"BPA"`,
 #'   `"DMSO"`, `"1-850"`, `"T3"`, `"ICI"`, `"EE2"`, `"BPA/ICI"`,
 #'   `"BPA/1-850"`, `"BPA/1-850/ICI"`, or `"user_input"`.
@@ -78,6 +80,7 @@ zeus_import <- function(
     nd_step = 0.5,
     repeats_per_level = 4,
     n_protocol_repeats = 10,
+    nd_descending = TRUE,
     treatment_group = NULL,
     treatment_group_custom = NULL,
     date_of_fertilization = NA,
@@ -102,7 +105,6 @@ zeus_import <- function(
   df_long <- abf_as_df_long(raw_abf)
 
   if (isTRUE(apply_boxcar)) {
-
     if (is.null(boxcar_k) && is.null(boxcar_width)) {
       boxcar_width <- 0.002
     }
@@ -126,6 +128,7 @@ zeus_import <- function(
       nd_step = nd_step,
       repeats_per_level = repeats_per_level,
       n_protocol_repeats = n_protocol_repeats,
+      nd_descending = nd_descending,
       treatment_group = treatment_group,
       treatment_group_custom = treatment_group_custom,
       date_of_fertilization = date_of_fertilization,
@@ -135,6 +138,8 @@ zeus_import <- function(
 
   df_long
 }
+
+
 # Convert to long DF -----------------------------------------------------------
 
 #' Convert readABF output to a standardized long data frame
@@ -170,6 +175,7 @@ abf_as_df_long <- function(raw_abf) {
   })
 }
 
+
 # Convert to wide DF -----------------------------------------------------------
 
 #' Convert readABF output to a standardized wide data frame
@@ -199,7 +205,7 @@ abf_as_df_wide <- function(raw_abf) {
 
     tibble::add_column(
       df,
-      sweep = s,
+      sweep = as.integer(s),
       time = time,
       .before = 1
     )
@@ -329,6 +335,7 @@ zeus_boxcar_filter <- function(df_long,
   out
 }
 
+
 # Calibration table ------------------------------------------------------------
 
 #' Default Neutral Density (ND) to irradiance calibration table
@@ -372,6 +379,7 @@ nd_to_irradiance_log10 <- function(stim_nd, calib = NULL) {
 #' @param nd_step Step size between ND levels.
 #' @param repeats_per_level Number of repeated sweeps per ND level.
 #' @param n_protocol_repeats Number of full protocol repeats.
+#' @param nd_descending Logical; if `TRUE`, order ND levels from high to low.
 #'
 #' @return A data.frame describing the sweep protocol.
 #' @keywords internal
@@ -380,9 +388,15 @@ make_protocol_default <- function(
     nd_end = 6.0,
     nd_step = 0.5,
     repeats_per_level = 4,
-    n_protocol_repeats = 10
+    n_protocol_repeats = 10,
+    nd_descending = TRUE
 ) {
   nd_levels <- seq(nd_start, nd_end, by = nd_step)
+
+  if (isTRUE(nd_descending)) {
+    nd_levels <- rev(nd_levels)
+  }
+
   one_protocol <- rep(nd_levels, each = repeats_per_level)
   stim_nd <- rep(one_protocol, times = n_protocol_repeats)
 
@@ -403,6 +417,7 @@ make_protocol_default <- function(
 #' @param nd_step Step size between ND levels.
 #' @param repeats_per_level Number of repeated sweeps per ND level.
 #' @param n_protocol_repeats Number of full protocol repeats.
+#' @param nd_descending Logical; if `TRUE`, order ND levels from high to low.
 #'
 #' @return A data.frame describing the sweep protocol.
 #' @keywords internal
@@ -411,9 +426,15 @@ make_protocol_C1 <- function(
     nd_end = 6.0,
     nd_step = 0.5,
     repeats_per_level = 4,
-    n_protocol_repeats = 10
+    n_protocol_repeats = 10,
+    nd_descending = TRUE
 ) {
   nd_levels <- seq(nd_start, nd_end, by = nd_step)
+
+  if (isTRUE(nd_descending)) {
+    nd_levels <- rev(nd_levels)
+  }
+
   one_protocol <- rep(nd_levels, each = repeats_per_level)
   stim_nd <- rep(one_protocol, times = n_protocol_repeats)
 
@@ -482,6 +503,8 @@ make_protocol_C0 <- function(repeats_per_level = 4) {
 #' @param nd_step Step size between ND levels.
 #' @param repeats_per_level Number of repeated sweeps per ND level.
 #' @param n_protocol_repeats Number of full protocol repeats.
+#' @param nd_descending Logical; if `TRUE`, order ND levels from high to low
+#'   for default/C1 protocols.
 #'
 #' @return A protocol table with `stim_order`, `stim_type`, `stim_nd`, and `wavelength`.
 #' @keywords internal
@@ -491,7 +514,8 @@ make_protocol_table <- function(
     nd_end = 6.0,
     nd_step = 0.5,
     repeats_per_level = 4,
-    n_protocol_repeats = 10
+    n_protocol_repeats = 10,
+    nd_descending = TRUE
 ) {
   protocol <- match.arg(protocol)
 
@@ -502,14 +526,16 @@ make_protocol_table <- function(
       nd_end = nd_end,
       nd_step = nd_step,
       repeats_per_level = repeats_per_level,
-      n_protocol_repeats = n_protocol_repeats
+      n_protocol_repeats = n_protocol_repeats,
+      nd_descending = nd_descending
     ),
     C1 = make_protocol_C1(
       nd_start = nd_start,
       nd_end = nd_end,
       nd_step = nd_step,
       repeats_per_level = repeats_per_level,
-      n_protocol_repeats = n_protocol_repeats
+      n_protocol_repeats = n_protocol_repeats,
+      nd_descending = nd_descending
     ),
     C0 = make_protocol_C0(
       repeats_per_level = repeats_per_level
@@ -517,15 +543,13 @@ make_protocol_table <- function(
   )
 }
 
+
 # Allowed Treatment values -----------------------------------------------------
+
 #' Allowed treatment group values
-#'
-#' Internal helper returning the controlled vocabulary of supported
-#' treatment group identifiers used in ZEUS metadata.
 #'
 #' @return A character vector of allowed treatment group labels.
 #' @keywords internal
-
 .allowed_treatment_groups <- function() {
   c("SYS Water",
     "BPA",
@@ -542,54 +566,26 @@ make_protocol_table <- function(
 
 #' Allowed ERG age categories
 #'
-#' Internal helper returning the allowed age categories for ERG recordings.
-#'
 #' @return A character vector of allowed ERG age values.
 #' @keywords internal
-
 .allowed_erg_age <- function() {
   c("Larval", "Adult")
 }
 
 
 # Treatment and Age Metadata Helper --------------------------------------------
+
 #' Construct sample-level metadata for ERG recordings
 #'
-#' Internal helper used to validate and construct meta data describing
-#' the sample associated with the ERG recording. This includes the treatment
-#' group identity, date of fertilization, and developmental stage at the time
-#' of ERG recording.
-#'
-#' Treatment groups are confirmed against a controlled list by
-#' `.allowed_treatment_grous()`. If `"user_input"` is specified, a custom
-#' treatment label must be provided via `treatment_group_custom`.
-#'
-#' ERG age is validated against `.allowed_erg_age()`.
-#'
 #' @param treatment_group Character string specifying treatment group.
-#'  Must be one of: `"SYS Water"`, `"BPA"`, `"DMSO"`, `"1-850"`, `"T3"`,
-#'   `"ICI"`, `"EE2"`, `"BPA/ICI"`, `"BPA/1-850"`, `"BPA/1-850/ICI"`,
-#'   or `"user_input"`.
-#'
 #' @param treatment_group_custom Character string used when `treatment_group`
 #'   = `"user_input"` to specify a custom treatment label.
+#' @param date_of_fertilization Date of fertilization for the fish.
+#' @param erg_age Character string describing developmental stage at ERG.
 #'
-#' @param date_of_fertilization Date of fertilization for the fish. Accepts
-#' `Date` objects or date-like value, using `as.Date()` to coerce
-#' for the format.
-#'
-#' @param erg_date Character string describing developmental stage at the time
-#' of ERG recording. Must be `"larval"` or `"adult"`.
-#'
-#' @return A data frame containing validated sample metadata with columns:
-#' \describe{
-#'  \item{treatment_group}{Treatment group label.}
-#'  \item{date_of_fertilization}{Date of fertilization for the sample.}
-#'  \item{erg_age}{Developmental stage at ERG recording.}
-#'  }
+#' @return A data frame containing validated sample metadata.
 #' @importFrom lubridate mdy
 #' @keywords internal
-
 make_sample_metadata <- function(
     treatment_group = NULL,
     treatment_group_custom = NULL,
@@ -668,6 +664,7 @@ make_sample_metadata <- function(
   )
 }
 
+
 # Protocol joiner --------------------------------------------------------------
 
 #' Add protocol-derived stimulus columns to long-form ABF data
@@ -680,6 +677,8 @@ make_sample_metadata <- function(
 #' @param nd_step Step size for default/C1 protocols.
 #' @param repeats_per_level Number of repeated sweeps per ND level.
 #' @param n_protocol_repeats Number of full protocol repeats.
+#' @param nd_descending Logical; if `TRUE`, order ND levels from high to low
+#'   for default/C1 protocols.
 #'
 #' @return The input data frame with stimulus metadata joined by sweep.
 #' @keywords internal
@@ -692,6 +691,7 @@ add_stimulus_cols_protocol <- function(
     nd_step = 0.5,
     repeats_per_level = 4,
     n_protocol_repeats = 10,
+    nd_descending = TRUE,
     treatment_group = NULL,
     treatment_group_custom = NULL,
     date_of_fertilization = NA,
@@ -712,7 +712,8 @@ add_stimulus_cols_protocol <- function(
     nd_end = nd_end,
     nd_step = nd_step,
     repeats_per_level = repeats_per_level,
-    n_protocol_repeats = n_protocol_repeats
+    n_protocol_repeats = n_protocol_repeats,
+    nd_descending = nd_descending
   )
 
   sweeps_present <- sort(unique(as.integer(df_long$sweep)))
