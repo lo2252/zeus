@@ -73,7 +73,6 @@ zeus_find_extrema <- function(df_long,
     )
 }
 
-
 #' Creates a sweep-level ERG feature table from ZEUS long-format data using a
 #' biologically ordered sequence:
 #' \itemize{

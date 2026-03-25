@@ -1,3 +1,5 @@
+# Importing Raw ERG -------------------------------------------------------
+
 #' Importing raw erg.abf files
 #'
 #' @description
@@ -36,6 +38,7 @@ read_abf_raw <- function(path, ...) {
   )
 }
 
+# Import/Clean Data -------------------------------------------------------
 
 #' Read an ABF file and return a standardized long data frame
 #'
@@ -139,7 +142,6 @@ zeus_import <- function(
   df_long
 }
 
-
 # Convert to long DF -----------------------------------------------------------
 
 #' Convert readABF output to a standardized long data frame
@@ -174,7 +176,6 @@ abf_as_df_long <- function(raw_abf) {
     )
   })
 }
-
 
 # Convert to wide DF -----------------------------------------------------------
 
@@ -211,7 +212,6 @@ abf_as_df_wide <- function(raw_abf) {
     )
   })
 }
-
 
 # Boxcar filter -----------------------------------------------------------
 
@@ -335,7 +335,6 @@ zeus_boxcar_filter <- function(df_long,
   out
 }
 
-
 # Calibration table ------------------------------------------------------------
 
 #' Default Neutral Density (ND) to irradiance calibration table
@@ -368,7 +367,6 @@ nd_to_irradiance_log10 <- function(stim_nd, calib = NULL) {
   o <- order(x)
   stats::approx(x = x[o], y = y[o], xout = stim_nd, rule = 2)$y
 }
-
 
 # Protocol builders ------------------------------------------------------------
 
@@ -447,7 +445,6 @@ make_protocol_C1 <- function(
   )
 }
 
-
 #' Build the C0 spectral protocol
 #'
 #' In the spectral protocol, each wavelength has its own ordered ND sequence.
@@ -493,7 +490,6 @@ make_protocol_C0 <- function(repeats_per_level = 4) {
   rownames(protocol_df) <- NULL
   protocol_df
 }
-
 
 #' Build protocol table based on selected protocol
 #'
@@ -571,7 +567,6 @@ make_protocol_table <- function(
 .allowed_erg_age <- function() {
   c("Larval", "Adult")
 }
-
 
 # Treatment and Age Metadata Helper --------------------------------------------
 
@@ -663,7 +658,6 @@ make_sample_metadata <- function(
     stringsAsFactors = FALSE
   )
 }
-
 
 # Protocol joiner --------------------------------------------------------------
 
@@ -769,3 +763,4 @@ add_stimulus_cols_protocol <- function(
     ) |>
     dplyr::filter(!is.na(.data$stim_nd))
 }
+
