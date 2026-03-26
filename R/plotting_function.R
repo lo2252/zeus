@@ -55,7 +55,7 @@ zeus_plot_mean_waveform <- function(
     base_size = 12
 ) {
 
-  # 1. Input validation
+  # Input validation
   required_cols <- c("time", "value", "stim_nd")
   missing_cols <- setdiff(required_cols, names(df_long))
 
@@ -95,7 +95,7 @@ zeus_plot_mean_waveform <- function(
     )
   }
 
-  # 2. Stimulus ordering
+  # Stimulus ordering
   if (is.null(stim_levels)) {
     stim_unique <- unique(df_plot$stim_nd)
 
@@ -108,8 +108,7 @@ zeus_plot_mean_waveform <- function(
 
   stim_levels_chr <- as.character(stim_levels)
 
-  # 3. Color palette
-  # Publication-friendly and colorblind-aware
+  # Color palette
   nd_palette <- c(
     "#332288", "#88CCEE", "#44AA99", "#117733",
     "#999933", "#DDCC77", "#CC6677", "#882255", "#AA4499"
@@ -117,7 +116,7 @@ zeus_plot_mean_waveform <- function(
   nd_colors <- rep(nd_palette, length.out = length(stim_levels_chr))
   names(nd_colors) <- stim_levels_chr
 
-  # 4. Aggregate data
+  # Aggregate data
   df_by_stim <- df_plot |>
     dplyr::group_by(.data$time, .data$stim_nd) |>
     dplyr::summarise(
@@ -174,7 +173,7 @@ zeus_plot_mean_waveform <- function(
     df_overall <- NULL
   }
 
-  # 5. Build plot
+  # Build plot
   p <- ggplot2::ggplot()
 
   if (isTRUE(compare_raw)) {
@@ -245,7 +244,7 @@ zeus_plot_mean_waveform <- function(
       )
   }
 
-  # 6. Marker overlay
+  # Marker overlay
   if (isTRUE(overlay_markers) && isTRUE(include_overall)) {
     overall_for_markers <- df_overall |>
       dplyr::filter(.data$signal_type == "Smoothed") |>
@@ -295,7 +294,7 @@ zeus_plot_mean_waveform <- function(
       )
   }
 
-  # 7. Final styling
+  # Final formating
   color_values <- c(nd_colors, "Overall Mean" = overall_color)
   color_breaks <- c(stim_levels_chr, if (isTRUE(include_overall)) "Overall Mean")
 
@@ -364,37 +363,73 @@ zeus_plot_mean_waveform <- function(
 
 
 # Mean Plotting by ND -----------------------------------------------------
-#' Plot mean ERG waveform for each ND level with wave identification
+
+#' Plot ERG intensity-response curves for A-, B-, and D-wave features
 #'
-#' @param df_long ZEUS long-format data frame.
-#' @param channel_filter Optional channel to filter.
-#' @param compare_raw Logical; if TRUE, plots raw and smoothed means.
-#' @param stim_levels Optional desired order of stim_nd values.
-#' @param free_y Logical; if TRUE, each facet gets its own y scale.
-#' @param overlay_markers Logical; if TRUE, add A/B/D reference lines.
-#' @param a_window Numeric length-2 vector for A-wave search interval.
-#' @param b_window Numeric length-2 vector for B-wave search interval.
-#' @param d_window Numeric length-2 vector for D-wave search interval.
-#' @param marker_color Color for reference lines.
-#' @param base_size Base font size.
+#' @description
+#' This function generates a multi-panel intensity-response plot for ERG data,
+#' displaying A-wave trough amplitude, B-wave peak amplitude, and D-wave peak
+#' amplitude as a function of stimulus ND.
 #'
-#' @return A ggplot object.
+#' The function is designed to operate directly on the output of
+#' \code{zeus_import()}, internally extracting waveform features using
+#' \code{zeus_extract_features()} before computing summary statistics.
+#'
+#' The resulting plot shows mean response values for each wave type across
+#' stimulus ND levels, optionally grouped by a categorical variable such as
+#' treatment group. Standard error bars can also be included.
+#'
+#' @param df_long A data frame in ZEUS long format, typically produced by
+#'   \code{zeus_import()}. Must contain columns \code{time}, \code{value},
+#'   \code{sweep}, and \code{stim_nd}.
+#'
+#' @param channel_filter Character string specifying the channel to
+#'   analyze (e.g., \code{"ERG DAM80"}). If \code{NULL}, all channels are used.
+#'
+#' @param group_col Optional character string specifying a grouping variable
+#'   (e.g., \code{"treatment_group"}). If provided, separate curves are plotted
+#'   for each group.
+#'
+#' @param use_se Logical; if \code{TRUE}, standard error bars (mean ± SE) are
+#'   displayed. Default is \code{TRUE}.
+#'
+#' @param base_size Numeric base font size for the plot theme. Default is 11.
+#'
+#' @details
+#' The function performs the following steps:
+#' \enumerate{
+#'   \item Extracts A-wave, B-wave, and D-wave features using
+#'         \code{zeus_extract_features()}.
+#'   \item Reshapes the data into long format for plotting.
+#'   \item Computes summary statistics (mean and standard error) for each wave
+#'         across stimulus ND levels and optional grouping.
+#'   \item Generates a faceted plot with one panel per wave type.
+#' }
+#'
+#' The three panels correspond to:
+#' \itemize{
+#'   \item A-wave trough amplitude
+#'   \item B-wave peak amplitude
+#'   \item D-wave peak amplitude
+#' }
+#'
+#' Stimulus ND is displayed on the x-axis in descending order so that larger ND
+#' values appear first.
+#'
+#' @return A \code{ggplot2} object showing intensity-response curves for each
+#'   wave type.
+#'
 #' @export
-zeus_plot_mean_by_nd <- function(
+zeus_plot_intensity_response <- function(
     df_long,
-    channel_filter = NULL,
-    compare_raw = FALSE,
-    stim_levels = NULL,
-    free_y = FALSE,
-    overlay_markers = TRUE,
-    a_window = c(0.4, 0.7),
-    b_window = c(0.4, 0.7),
-    d_window = c(0.7, 1.0),
-    marker_color = "black",
-    base_size = 12
+    channel_filter = "ERG DAM80",
+    group_col = NULL,
+    use_se = TRUE,
+    base_size = 11
 ) {
 
-  required_cols <- c("time", "value", "stim_nd")
+  # Input validation
+  required_cols <- c("time", "value", "sweep", "stim_nd")
   missing_cols <- setdiff(required_cols, names(df_long))
 
   if (length(missing_cols) > 0) {
@@ -405,178 +440,119 @@ zeus_plot_mean_by_nd <- function(
     )
   }
 
-  df_plot <- df_long
-
-  if (!is.null(channel_filter)) {
-    if (!"channel" %in% names(df_plot)) {
-      stop("`channel_filter` provided but no `channel` column found.", call. = FALSE)
-    }
-
-    df_plot <- df_plot |>
-      dplyr::filter(.data$channel == channel_filter)
-
-    if (nrow(df_plot) == 0) {
-      stop("No data left after applying `channel_filter`.", call. = FALSE)
-    }
+  if (!is.null(group_col) && !group_col %in% names(df_long)) {
+    stop("`group_col` not found in df_long.", call. = FALSE)
   }
 
-  if (isTRUE(compare_raw) && !"value_raw" %in% names(df_plot)) {
-    stop("`compare_raw = TRUE` requires a `value_raw` column.", call. = FALSE)
+  if (!is.null(channel_filter) && !"channel" %in% names(df_long)) {
+    stop("`channel_filter` supplied but no `channel` column found.", call. = FALSE)
   }
 
-  if (is.null(stim_levels)) {
-    stim_unique <- unique(df_plot$stim_nd)
-
-    if (is.numeric(stim_unique)) {
-      stim_levels <- sort(stim_unique, decreasing = FALSE)
-    } else {
-      stim_levels <- sort(as.character(stim_unique), decreasing = FALSE)
-    }
-  }
-
-  stim_levels_chr <- as.character(stim_levels)
-
-  if (isTRUE(compare_raw)) {
-    df_summary <- df_plot |>
-      dplyr::group_by(.data$time, .data$stim_nd) |>
-      dplyr::summarise(
-        Raw = mean(.data$value_raw, na.rm = TRUE),
-        Smoothed = mean(.data$value, na.rm = TRUE),
-        .groups = "drop"
-      ) |>
-      tidyr::pivot_longer(
-        cols = c("Raw", "Smoothed"),
-        names_to = "signal_type",
-        values_to = "signal"
-      ) |>
-      dplyr::mutate(
-        stim_nd = factor(as.character(.data$stim_nd), levels = stim_levels_chr)
-      )
-  } else {
-    df_summary <- df_plot |>
-      dplyr::group_by(.data$time, .data$stim_nd) |>
-      dplyr::summarise(
-        signal = mean(.data$value, na.rm = TRUE),
-        .groups = "drop"
-      ) |>
-      dplyr::mutate(
-        signal_type = "Smoothed",
-        stim_nd = factor(as.character(.data$stim_nd), levels = stim_levels_chr)
-      )
-  }
-
-  marker_lines <- NULL
-
-  if (isTRUE(overlay_markers)) {
-    marker_source <- if (isTRUE(compare_raw)) {
-      df_summary |>
-        dplyr::filter(.data$signal_type == "Smoothed")
-    } else {
-      df_summary
-    }
-
-    get_marker <- function(data, window, label, extreme_fn) {
-      data |>
-        dplyr::filter(.data$time >= window[1], .data$time <= window[2]) |>
-        dplyr::group_by(.data$stim_nd) |>
-        extreme_fn(order_by = .data$signal, n = 1, with_ties = FALSE) |>
-        dplyr::ungroup() |>
-        dplyr::transmute(
-          stim_nd = .data$stim_nd,
-          marker_type = label,
-          time_ms = .data$time * 1000
-        )
-    }
-
-    marker_lines <- dplyr::bind_rows(
-      get_marker(marker_source, a_window, "A-wave trough", dplyr::slice_min),
-      get_marker(marker_source, b_window, "B-wave peak", dplyr::slice_max),
-      get_marker(marker_source, d_window, "D-wave peak", dplyr::slice_max)
-    ) |>
-      dplyr::mutate(
-        marker_type = factor(
-          .data$marker_type,
-          levels = c("A-wave trough", "B-wave peak", "D-wave peak")
-        )
-      )
-  }
-
-  p <- ggplot2::ggplot(
-    df_summary,
-    ggplot2::aes(x = .data$time * 1000, y = .data$signal)
+  # Feature extraction
+  features_df <- zeus_extract_features(
+    df_long = df_long,
+    channel_filter = channel_filter
   )
 
-  if (isTRUE(compare_raw)) {
+  # Reshape
+  select_cols <- c(
+    "stim_nd",
+    "a_wave_trough_uv",
+    "b_wave_peak_uv",
+    "d_wave_peak_uv"
+  )
+
+  if (!is.null(group_col)) {
+    select_cols <- c(select_cols, group_col)
+  }
+
+  df_plot <- features_df |>
+    dplyr::select(dplyr::all_of(select_cols)) |>
+    tidyr::pivot_longer(
+      cols = c("a_wave_trough_uv", "b_wave_peak_uv", "d_wave_peak_uv"),
+      names_to = "wave",
+      values_to = "response"
+    ) |>
+    dplyr::mutate(
+      wave = dplyr::recode(
+        wave,
+        "a_wave_trough_uv" = "A-wave",
+        "b_wave_peak_uv" = "B-wave",
+        "d_wave_peak_uv" = "D-wave"
+      )
+    ) |>
+    dplyr::filter(!is.na(response), !is.na(stim_nd))
+
+  # Summary stats
+  group_vars <- c("stim_nd", "wave")
+  if (!is.null(group_col)) group_vars <- c(group_vars, group_col)
+
+  df_summary <- df_plot |>
+    dplyr::group_by(dplyr::across(dplyr::all_of(group_vars))) |>
+    dplyr::summarise(
+      n = dplyr::n(),
+      mean = mean(response, na.rm = TRUE),
+      se = stats::sd(response, na.rm = TRUE) / sqrt(n),
+      .groups = "drop"
+    )
+
+  # Plot
+  p <- ggplot2::ggplot(
+    df_summary,
+    ggplot2::aes(
+      x = stim_nd,
+      y = mean
+    )
+  )
+
+  if (!is.null(group_col)) {
     p <- p +
-      ggplot2::geom_line(
-        ggplot2::aes(linetype = .data$signal_type),
-        linewidth = 0.7,
-        color = "black"
-      ) +
-      ggplot2::scale_linetype_manual(
-        name = "Signal",
-        values = c("Raw" = "solid", "Smoothed" = "longdash")
+      ggplot2::aes(
+        color = .data[[group_col]],
+        group = interaction(.data[[group_col]], wave)
       )
   } else {
     p <- p +
-      ggplot2::geom_line(
-        linewidth = 0.8,
-        color = "red"
-      )
+      ggplot2::aes(group = wave)
   }
 
-  if (isTRUE(overlay_markers) && !is.null(marker_lines)) {
+  p <- p +
+    ggplot2::geom_line(linewidth = 1.0, lineend = "round") +
+    ggplot2::geom_point(size = 2.2)
+
+  if (isTRUE(use_se)) {
     p <- p +
-      ggplot2::geom_vline(
-        data = marker_lines,
+      ggplot2::geom_errorbar(
         ggplot2::aes(
-          xintercept = .data$time_ms,
-          linetype = .data$marker_type
+          ymin = mean - se,
+          ymax = mean + se
         ),
-        color = marker_color,
-        linewidth = 0.7,
-        alpha = 0.95,
-        inherit.aes = FALSE
-      ) +
-      ggplot2::scale_linetype_manual(
-        name = if (isTRUE(compare_raw)) "Line type" else "Reference lines",
-        values = c(
-          "A-wave trough" = "dotted",
-          "B-wave peak" = "longdash",
-          "D-wave peak" = "dotdash",
-          "Raw" = "solid",
-          "Smoothed" = "longdash"
-        ),
-        breaks = if (isTRUE(compare_raw)) {
-          c("Raw", "Smoothed", "A-wave trough", "B-wave peak", "D-wave peak")
-        } else {
-          c("A-wave trough", "B-wave peak", "D-wave peak")
-        }
+        width = 0.1,
+        linewidth = 0.4
       )
   }
 
   p +
-    ggplot2::facet_wrap(
-      ~stim_nd,
-      scales = if (isTRUE(free_y)) "free_y" else "fixed"
-    ) +
-    ggplot2::scale_x_continuous(
-      breaks = scales::pretty_breaks(n = 6),
-      expand = ggplot2::expansion(mult = c(0.01, 0.03))
-    ) +
-    ggplot2::scale_y_continuous(
-      breaks = scales::pretty_breaks(n = 5),
-      expand = ggplot2::expansion(mult = c(0.03, 0.08))
-    ) +
+    ggplot2::facet_wrap(~wave, nrow = 1, scales = "free_y") +
+    ggplot2::scale_x_reverse() +   # 🔥 KEY FIX
     ggplot2::labs(
-      title = "Mean ERG Waveform by ND Level",
-      x = "Time (ms)",
-      y = expression("Response (" * mu * "V)")
+      x = "Stimulus ND",
+      y = expression("Response (" * mu * "V)"),
+      title = "Wave Intensity Response",
+      color = if (!is.null(group_col)) group_col else NULL
     ) +
     ggplot2::theme_classic(base_size = base_size) +
     ggplot2::theme(
-      plot.title = ggplot2::element_text(face = "bold", hjust = 0.5),
+      axis.title = ggplot2::element_text(face = "bold"),
+      strip.background = ggplot2::element_blank(),
       strip.text = ggplot2::element_text(face = "bold"),
-      legend.position = "right"
+      legend.title = ggplot2::element_text(face = "bold"),
+      legend.position = if (!is.null(group_col)) "right" else "none",
+      plot.title = ggplot2::element_text(
+        hjust = 0.5,
+        face = "bold"),
+      axis.line = ggplot2::element_line(linewidth = 0.5),
+      axis.ticks = ggplot2::element_line(linewidth = 0.4),
+      panel.spacing = grid::unit(1.2, "lines")
     )
 }
