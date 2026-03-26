@@ -1,3 +1,5 @@
+# Importing Raw ERG -------------------------------------------------------
+
 #' Importing raw erg.abf files
 #'
 #' @description
@@ -36,6 +38,7 @@ read_abf_raw <- function(path, ...) {
   )
 }
 
+# Import/Clean Data -------------------------------------------------------
 
 #' Read an ABF file and return a standardized long data frame
 #'
@@ -85,11 +88,11 @@ zeus_import <- function(
     treatment_group_custom = NULL,
     date_of_fertilization = NA,
     erg_age = NULL,
-    apply_boxcar = FALSE,
+    apply_boxcar = TRUE,
     boxcar_channel_pattern = "DAM80",
     boxcar_k = NULL,
     boxcar_width = NULL,
-    keep_raw_boxcar = FALSE
+    keep_raw_boxcar = TRUE
 ) {
 
   protocol <- match.arg(protocol)
@@ -139,7 +142,6 @@ zeus_import <- function(
   df_long
 }
 
-
 # Convert to long DF -----------------------------------------------------------
 
 #' Convert readABF output to a standardized long data frame
@@ -174,7 +176,6 @@ abf_as_df_long <- function(raw_abf) {
     )
   })
 }
-
 
 # Convert to wide DF -----------------------------------------------------------
 
@@ -212,28 +213,32 @@ abf_as_df_wide <- function(raw_abf) {
   })
 }
 
-
 # Boxcar filter -----------------------------------------------------------
 
 #' Apply a boxcar filter to selected channels in long-format ABF data
 #'
+#' @description
 #' Applies a centered moving-average (boxcar) filter to the `value` column
 #' within each sweep for channels matching `channel_pattern`.
 #'
+#' By default, this function uses a 33-point running average, corresponding to
+#' a 16.5 ms boxcar window when the sampling interval is 0.5 ms.
+#'
 #' @param df_long Long-format ABF data.
 #' @param channel_pattern Character string identifying channel to smooth.
-#' @param k Optional integer window size for the filter. If `NULL`, `k` is
-#'   computed from `boxcar_width` and the spacing in `time`.
+#'   Default is `"DAM80"`.
+#' @param k Optional integer window size for the filter. Default is `33`.
+#'   If supplied, this takes priority over `boxcar_width`.
 #' @param boxcar_width Optional numeric smoothing width in the same units as
-#'   `df_long$time`. Used only when `k` is `NULL`.
+#'   `df_long$time`. Default is `0.0165` (16.5 ms). Used only when `k` is `NULL`.
 #' @param keep_raw Logical; if `TRUE`, store original signal in `value_raw`.
 #'
 #' @return Data frame with smoothed `value`.
 #' @keywords internal
 zeus_boxcar_filter <- function(df_long,
                                channel_pattern = "DAM80",
-                               k = NULL,
-                               boxcar_width = NULL,
+                               k = 33,
+                               boxcar_width = 0.0165,
                                keep_raw = FALSE) {
 
   required_cols <- c("sweep", "time", "channel", "value")
@@ -335,7 +340,6 @@ zeus_boxcar_filter <- function(df_long,
   out
 }
 
-
 # Calibration table ------------------------------------------------------------
 
 #' Default Neutral Density (ND) to irradiance calibration table
@@ -368,7 +372,6 @@ nd_to_irradiance_log10 <- function(stim_nd, calib = NULL) {
   o <- order(x)
   stats::approx(x = x[o], y = y[o], xout = stim_nd, rule = 2)$y
 }
-
 
 # Protocol builders ------------------------------------------------------------
 
@@ -447,7 +450,6 @@ make_protocol_C1 <- function(
   )
 }
 
-
 #' Build the C0 spectral protocol
 #'
 #' In the spectral protocol, each wavelength has its own ordered ND sequence.
@@ -493,7 +495,6 @@ make_protocol_C0 <- function(repeats_per_level = 4) {
   rownames(protocol_df) <- NULL
   protocol_df
 }
-
 
 #' Build protocol table based on selected protocol
 #'
@@ -571,7 +572,6 @@ make_protocol_table <- function(
 .allowed_erg_age <- function() {
   c("Larval", "Adult")
 }
-
 
 # Treatment and Age Metadata Helper --------------------------------------------
 
@@ -663,7 +663,6 @@ make_sample_metadata <- function(
     stringsAsFactors = FALSE
   )
 }
-
 
 # Protocol joiner --------------------------------------------------------------
 
@@ -769,3 +768,4 @@ add_stimulus_cols_protocol <- function(
     ) |>
     dplyr::filter(!is.na(.data$stim_nd))
 }
+
