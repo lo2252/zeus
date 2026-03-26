@@ -362,7 +362,7 @@ zeus_plot_mean_waveform <- function(
 }
 
 
-# Mean Plotting by ND -----------------------------------------------------
+# Intensity Response by ND -----------------------------------------------------
 
 #' Plot ERG intensity-response curves for A-, B-, and D-wave features
 #'
@@ -556,3 +556,5 @@ zeus_plot_intensity_response <- function(
       panel.spacing = grid::unit(1.2, "lines")
     )
 }
+
+
