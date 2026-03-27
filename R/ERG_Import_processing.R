@@ -60,15 +60,17 @@ read_abf_raw <- function(path, ...) {
 #' @param date_of_fertilization Date of fertilization for the fish.
 #' @param erg_age Age at ERG, one of `"Larval"` or `"Adult"`.
 #' @param apply_boxcar Logical; if `TRUE`, applies a boxcar filter to selected
-#'   response channels before stimulus annotation.
+#'   response channels before stimulus annotation. Default is `TRUE`.
 #' @param boxcar_channel_pattern Character string used to identify the channel
 #'   to smooth. Default is `"DAM80"`.
-#' @param boxcar_k Optional integer window size for the boxcar filter. If not
-#'   supplied, `boxcar_width` is used to determine the window size.
+#' @param boxcar_k Optional integer window size for the boxcar filter.
+#'   If `NULL`, the default ZEUS standard is used.
 #' @param boxcar_width Optional numeric smoothing width in the same units as
-#'   the `time` column. Used only when `boxcar_k` is `NULL`.
+#'   the `time` column. Used only when `boxcar_k` is `NULL`. If both
+#'   `boxcar_k` and `boxcar_width` are `NULL`, the ZEUS default 33-point
+#'   running average is used.
 #' @param keep_raw_boxcar Logical; if `TRUE`, stores the original unsmoothed
-#'   signal in a new column called `value_raw`.
+#'   signal in a new column called `value_raw`. Default is `TRUE`.
 #'
 #' @return A tibble/data.frame in standardized long format.
 #' @export
@@ -108,8 +110,11 @@ zeus_import <- function(
   df_long <- abf_as_df_long(raw_abf)
 
   if (isTRUE(apply_boxcar)) {
+
+    # ZEUS default standard:
+    # 33-point running average
     if (is.null(boxcar_k) && is.null(boxcar_width)) {
-      boxcar_width <- 0.002
+      boxcar_k <- 33L
     }
 
     df_long <- zeus_boxcar_filter(
@@ -221,8 +226,12 @@ abf_as_df_wide <- function(raw_abf) {
 #' Applies a centered moving-average (boxcar) filter to the `value` column
 #' within each sweep for channels matching `channel_pattern`.
 #'
-#' By default, this function uses a 33-point running average, corresponding to
-#' a 16.5 ms boxcar window when the sampling interval is 0.5 ms.
+#' By default, this function applies an exact 33-point centered running average.
+#' When the sampling interval is 0.5 ms, this corresponds to a 16.5 ms boxcar
+#' filter as described by Deveau et al. (2020).
+#'
+#' Edge values are handled using partial windows rather than replacing with the
+#' raw unsmoothed signal.
 #'
 #' @param df_long Long-format ABF data.
 #' @param channel_pattern Character string identifying channel to smooth.
@@ -230,8 +239,11 @@ abf_as_df_wide <- function(raw_abf) {
 #' @param k Optional integer window size for the filter. Default is `33`.
 #'   If supplied, this takes priority over `boxcar_width`.
 #' @param boxcar_width Optional numeric smoothing width in the same units as
-#'   `df_long$time`. Default is `0.0165` (16.5 ms). Used only when `k` is `NULL`.
+#'   `df_long$time`. Used only when `k` is `NULL`.
 #' @param keep_raw Logical; if `TRUE`, store original signal in `value_raw`.
+#' @param warn_on_width_mismatch Logical; if `TRUE`, warn when the effective
+#'   width implied by `k` and the data sampling interval differs from the
+#'   requested `boxcar_width`.
 #'
 #' @return Data frame with smoothed `value`.
 #' @keywords internal
@@ -239,7 +251,8 @@ zeus_boxcar_filter <- function(df_long,
                                channel_pattern = "DAM80",
                                k = 33,
                                boxcar_width = 0.0165,
-                               keep_raw = FALSE) {
+                               keep_raw = TRUE,
+                               warn_on_width_mismatch = TRUE) {
 
   required_cols <- c("sweep", "time", "channel", "value")
   missing_cols <- setdiff(required_cols, names(df_long))
@@ -252,29 +265,29 @@ zeus_boxcar_filter <- function(df_long,
     )
   }
 
+  unique_time <- sort(unique(df_long$time))
+
+  if (length(unique_time) < 2) {
+    stop(
+      "Not enough unique time points to estimate sampling interval.",
+      call. = FALSE
+    )
+  }
+
+  dt <- stats::median(diff(unique_time), na.rm = TRUE)
+
+  if (!is.finite(dt) || dt <= 0) {
+    stop(
+      "Could not determine a valid sampling interval from `time`.",
+      call. = FALSE
+    )
+  }
+
   if (is.null(k)) {
     if (is.null(boxcar_width) || !is.numeric(boxcar_width) ||
         length(boxcar_width) != 1 || is.na(boxcar_width) || boxcar_width <= 0) {
       stop(
         "When `k` is NULL, `boxcar_width` must be a single numeric value > 0.",
-        call. = FALSE
-      )
-    }
-
-    unique_time <- sort(unique(df_long$time))
-
-    if (length(unique_time) < 2) {
-      stop(
-        "Not enough unique time points to estimate sampling interval.",
-        call. = FALSE
-      )
-    }
-
-    dt <- stats::median(diff(unique_time), na.rm = TRUE)
-
-    if (!is.finite(dt) || dt <= 0) {
-      stop(
-        "Could not determine a valid sampling interval from `time`.",
         call. = FALSE
       )
     }
@@ -297,18 +310,56 @@ zeus_boxcar_filter <- function(df_long,
     }
   }
 
-  if (isTRUE(keep_raw) && !"value_raw" %in% names(df_long)) {
-    df_long$value_raw <- df_long$value
+  effective_width <- k * dt
+
+  if (isTRUE(warn_on_width_mismatch) &&
+      !is.null(boxcar_width) &&
+      is.numeric(boxcar_width) &&
+      length(boxcar_width) == 1 &&
+      !is.na(boxcar_width) &&
+      abs(effective_width - boxcar_width) > (dt / 2)) {
+    warning(
+      "Effective boxcar width from k = ", k,
+      " is ", signif(effective_width, 6),
+      " time units, which differs from requested boxcar_width = ",
+      signif(boxcar_width, 6), ".",
+      call. = FALSE
+    )
   }
 
   idx <- grepl(channel_pattern, df_long$channel)
 
   if (!any(idx)) {
+    if (isTRUE(keep_raw) && !"value_raw" %in% names(df_long)) {
+      df_long$value_raw <- df_long$value
+    }
     return(df_long)
   }
 
   df_target <- df_long[idx, , drop = FALSE]
   df_other  <- df_long[!idx, , drop = FALSE]
+
+  if (isTRUE(keep_raw) && !"value_raw" %in% names(df_target)) {
+    df_target$value_raw <- df_target$value
+  }
+
+  if (isTRUE(keep_raw) && !"value_raw" %in% names(df_other)) {
+    df_other$value_raw <- df_other$value
+  }
+
+  centered_boxcar <- function(x, k) {
+    n <- length(x)
+    half_k <- (k - 1L) %/% 2L
+    out <- numeric(n)
+
+    for (i in seq_len(n)) {
+      left <- max(1L, i - half_k)
+      right <- min(n, i + half_k)
+      out[i] <- mean(x[left:right], na.rm = TRUE)
+    }
+
+    out
+  }
 
   split_groups <- split(
     df_target,
@@ -318,18 +369,11 @@ zeus_boxcar_filter <- function(df_long,
   filtered_groups <- lapply(split_groups, function(dat) {
     dat <- dat[order(dat$time), , drop = FALSE]
 
-    filt <- stats::filter(
-      dat$value,
-      rep(1 / k, k),
-      sides = 2
-    )
+    if (isTRUE(keep_raw) && !"value_raw" %in% names(dat)) {
+      dat$value_raw <- dat$value
+    }
 
-    filt <- as.numeric(filt)
-
-    na_idx <- is.na(filt)
-    filt[na_idx] <- dat$value[na_idx]
-
-    dat$value <- filt
+    dat$value <- centered_boxcar(dat$value, k = k)
     dat
   })
 
@@ -339,7 +383,6 @@ zeus_boxcar_filter <- function(df_long,
 
   out
 }
-
 # Calibration table ------------------------------------------------------------
 
 #' Default Neutral Density (ND) to irradiance calibration table
