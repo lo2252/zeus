@@ -90,10 +90,11 @@ zeus_import <- function(
     treatment_group_custom = NULL,
     date_of_fertilization = NA,
     erg_age = NULL,
+    apply_baseline = TRUE,
+    baseline_window = c(0, 0.3),
     apply_boxcar = TRUE,
     boxcar_channel_pattern = "DAM80",
     boxcar_k = NULL,
-    boxcar_width = NULL,
     keep_raw_boxcar = TRUE
 ) {
 
@@ -109,23 +110,25 @@ zeus_import <- function(
 
   df_long <- abf_as_df_long(raw_abf)
 
-  if (isTRUE(apply_boxcar)) {
-
-    # ZEUS default standard:
-    # 33-point running average
-    if (is.null(boxcar_k) && is.null(boxcar_width)) {
-      boxcar_k <- 33L
-    }
-
-    df_long <- zeus_boxcar_filter(
+  # Apply baseline
+  if (isTRUE(apply_baseline)) {
+    df_long <- zeus_baseline_correct(
       df_long = df_long,
+      baseline_window = baseline_window
+    )
+  }
+
+  # Apply Boxcar
+  if (isTRUE(apply_boxcar)) {
+    df_long <- zeus_boxcar_filter(
+      df_long,
       channel_pattern = boxcar_channel_pattern,
-      k = boxcar_k,
-      boxcar_width = boxcar_width,
+      k = if (is.null(boxcar_k)) 33 else boxcar_k,
       keep_raw = keep_raw_boxcar
     )
   }
 
+  # Add stim protocol
   if (isTRUE(add_stim)) {
     df_long <- add_stimulus_cols_protocol(
       df_long = df_long,
@@ -143,6 +146,7 @@ zeus_import <- function(
       erg_age = erg_age
     )
   }
+
 
   df_long
 }
@@ -218,6 +222,35 @@ abf_as_df_wide <- function(raw_abf) {
   })
 }
 
+
+# Baseline Correction -----------------------------------------------------
+
+zeus_baseline_correct <- function(df_long, baseline_window = c(0, 0.3)) {
+
+  required_cols <- c("sweep", "time", "value")
+  missing_cols <- setdiff(required_cols, names(df_long))
+
+  if (length(missing_cols) > 0) {
+    stop(
+      "df_long is missing required columns: ",
+      paste(missing_cols, collapse = ", "),
+      call. = FALSE
+    )
+  }
+
+  df_long |>
+    dplyr::group_by(sweep, channel) |>
+    dplyr::mutate(
+      baseline = mean(
+        value[time >= baseline_window[1] & time <= baseline_window[2]],
+        na.rm = TRUE
+      ),
+      value = value - baseline
+    ) |>
+    dplyr::ungroup() |>
+    dplyr::select(-baseline)
+}
+
 # Boxcar filter -----------------------------------------------------------
 
 #' Apply a boxcar filter to selected channels in long-format ABF data
@@ -250,9 +283,7 @@ abf_as_df_wide <- function(raw_abf) {
 zeus_boxcar_filter <- function(df_long,
                                channel_pattern = "DAM80",
                                k = 33,
-                               boxcar_width = 0.0165,
-                               keep_raw = TRUE,
-                               warn_on_width_mismatch = TRUE) {
+                               keep_raw = TRUE) {
 
   required_cols <- c("sweep", "time", "channel", "value")
   missing_cols <- setdiff(required_cols, names(df_long))
@@ -265,66 +296,14 @@ zeus_boxcar_filter <- function(df_long,
     )
   }
 
-  unique_time <- sort(unique(df_long$time))
-
-  if (length(unique_time) < 2) {
-    stop(
-      "Not enough unique time points to estimate sampling interval.",
-      call. = FALSE
-    )
+  if (!is.numeric(k) || length(k) != 1 || is.na(k) || k < 1) {
+    stop("`k` must be a single integer >= 1.", call. = FALSE)
   }
 
-  dt <- stats::median(diff(unique_time), na.rm = TRUE)
+  k <- as.integer(k)
 
-  if (!is.finite(dt) || dt <= 0) {
-    stop(
-      "Could not determine a valid sampling interval from `time`.",
-      call. = FALSE
-    )
-  }
-
-  if (is.null(k)) {
-    if (is.null(boxcar_width) || !is.numeric(boxcar_width) ||
-        length(boxcar_width) != 1 || is.na(boxcar_width) || boxcar_width <= 0) {
-      stop(
-        "When `k` is NULL, `boxcar_width` must be a single numeric value > 0.",
-        call. = FALSE
-      )
-    }
-
-    k <- as.integer(round(boxcar_width / dt))
-    k <- max(1L, k)
-
-    if (k %% 2 == 0) {
-      k <- k + 1L
-    }
-  } else {
-    if (!is.numeric(k) || length(k) != 1 || is.na(k) || k < 1) {
-      stop("`k` must be a single integer >= 1.", call. = FALSE)
-    }
-
-    k <- as.integer(k)
-
-    if (k %% 2 == 0) {
-      k <- k + 1L
-    }
-  }
-
-  effective_width <- k * dt
-
-  if (isTRUE(warn_on_width_mismatch) &&
-      !is.null(boxcar_width) &&
-      is.numeric(boxcar_width) &&
-      length(boxcar_width) == 1 &&
-      !is.na(boxcar_width) &&
-      abs(effective_width - boxcar_width) > (dt / 2)) {
-    warning(
-      "Effective boxcar width from k = ", k,
-      " is ", signif(effective_width, 6),
-      " time units, which differs from requested boxcar_width = ",
-      signif(boxcar_width, 6), ".",
-      call. = FALSE
-    )
+  if (k %% 2 == 0) {
+    stop("`k` must be odd for the legacy symmetric running average.", call. = FALSE)
   }
 
   idx <- grepl(channel_pattern, df_long$channel)
@@ -347,15 +326,26 @@ zeus_boxcar_filter <- function(df_long,
     df_other$value_raw <- df_other$value
   }
 
-  centered_boxcar <- function(x, k) {
+  legacy_boxcar <- function(x, k) {
     n <- length(x)
-    half_k <- (k - 1L) %/% 2L
     out <- numeric(n)
+    half_k <- (k - 1L) %/% 2L
 
     for (i in seq_len(n)) {
-      left <- max(1L, i - half_k)
-      right <- min(n, i + half_k)
-      out[i] <- mean(x[left:right], na.rm = TRUE)
+      start_idx <- i - half_k
+      end_idx   <- i + half_k
+
+      if (start_idx < 1L) {
+        start_idx <- 1L
+        end_idx <- min(k, n)
+      }
+
+      if (end_idx > n) {
+        end_idx <- n
+        start_idx <- max(1L, n - k + 1L)
+      }
+
+      out[i] <- mean(x[start_idx:end_idx], na.rm = TRUE)
     }
 
     out
@@ -368,12 +358,7 @@ zeus_boxcar_filter <- function(df_long,
 
   filtered_groups <- lapply(split_groups, function(dat) {
     dat <- dat[order(dat$time), , drop = FALSE]
-
-    if (isTRUE(keep_raw) && !"value_raw" %in% names(dat)) {
-      dat$value_raw <- dat$value
-    }
-
-    dat$value <- centered_boxcar(dat$value, k = k)
+    dat$value <- legacy_boxcar(dat$value, k = k)
     dat
   })
 
@@ -383,6 +368,7 @@ zeus_boxcar_filter <- function(df_long,
 
   out
 }
+
 # Calibration table ------------------------------------------------------------
 
 #' Default Neutral Density (ND) to irradiance calibration table

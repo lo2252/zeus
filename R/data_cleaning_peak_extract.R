@@ -126,7 +126,7 @@ zeus_extract_features <- function(df_long,
                                   b_window = c(0.4, 0.7),
                                   d_window = c(0.7, 1.0),
                                   min_b_trough_to_peak_uv = 5,
-                                  min_d_trough_to_peak_uv = 5) {
+                                  min_d_trough_to_peak_uv = 1) {
 
   required_cols <- c(
     "sweep", "time", "value", "stim_nd", "stim_irradiance_log10"
