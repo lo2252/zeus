@@ -357,71 +357,33 @@ zeus_extract_features <- function(df_long,
 
 
 # Legacy Feature Extract --------------------------------------------------
-
 #' Extract legacy-style ERG response features
 #'
 #' @description
-#' Extracts sweep-level ERG features using a legacy-style workflow designed to
-#' reproduce historical response measurements.
+#' Extracts legacy-style ERG features and averages each group of repeated
+#' sweeps within each stimulus ND level and protocol repeat.
 #'
-#' The function computes:
-#' \itemize{
-#'   \item noise within a baseline/noise window
-#'   \item A-wave trough amplitude within a response window
-#'   \item B-wave peak amplitude within the same response window
-#'   \item response amplitude as peak minus trough
-#'   \item peak time and trough time in milliseconds
-#' }
+#' For default/C1 protocols with 4 sweeps per ND and 10 protocol repeats,
+#' this yields 10 averaged values per `stim_nd`, arranged in legacy order:
+#' descending ND within each protocol repeat.
 #'
-#' @details
-#' This function is intended for compatibility with a legacy extraction method
-#' in which:
-#' \itemize{
-#'   \item noise is calculated from the `noise_window`
-#'   \item the A-wave trough is defined as the minimum value in the
-#'         `response_window`
-#'   \item the B-wave peak is defined as the maximum value in the
-#'         `response_window`
-#'   \item response amplitude is calculated as `bpeak - awave`
-#' }
-#'
-#' Unlike the more restrictive ZEUS feature extraction workflow, this legacy
-#' version does not require sequence-based validation between trough and peak
-#' and is intended specifically for reproducing historical output values.
-#'
-#' @param df_long A ZEUS long-format data frame. Must contain at minimum
-#'   `sweep`, `time`, `value`, `stim_nd`, and `stim_irradiance_log10`.
-#'
-#' @param channel_filter Optional character string specifying the channel to
-#'   analyze, such as `"ERG DAM80"`. If `NULL`, all rows are used.
-#'
+#' @param df_long A ZEUS long-format data frame.
+#' @param channel_filter Optional channel to analyze, such as `"ERG DAM80"`.
 #' @param response_window Numeric vector of length 2 giving the response window
 #'   in seconds. Default is `c(0.4, 0.7)`.
+#' @param noise_window Numeric vector of length 2 giving the noise window
+#'   in seconds. Default is `c(0.3, 0.4)`.
+#' @param sweeps_per_average Number of repeated sweeps to average together
+#'   within each stimulus ND level. Default is `4`.
 #'
-#' @param noise_window Numeric vector of length 2 giving the noise window in
-#'   seconds. Default is `c(0.3, 0.4)`.
-#'
-#' @return A tibble with one row per sweep containing:
-#' \itemize{
-#'   \item `stim_nd`
-#'   \item `stim_irradiance_log10`
-#'   \item `response` (B-wave peak minus A-wave trough)
-#'   \item `noise`
-#'   \item `awave`
-#'   \item `peaktime` (ms)
-#'   \item `troughtime` (ms)
-#' }
-#'
-#' Additional metadata columns present in the input, such as `stim_order`,
-#' `wavelength`, `treatment_group`, `date_of_fertilization`, and `erg_age`,
-#' are preserved when available.
-#'
+#' @return A tibble with one row per averaged stimulus block.
 #' @export
 zeus_extract_features_legacy <- function(
     df_long,
     channel_filter = "ERG DAM80",
     response_window = c(0.4, 0.7),
-    noise_window = c(0.3, 0.4)
+    noise_window = c(0.3, 0.4),
+    sweeps_per_average = 4
 ) {
 
   required_cols <- c("sweep", "time", "value", "stim_nd", "stim_irradiance_log10")
@@ -434,6 +396,15 @@ zeus_extract_features_legacy <- function(
       call. = FALSE
     )
   }
+
+  if (!is.numeric(sweeps_per_average) ||
+      length(sweeps_per_average) != 1 ||
+      is.na(sweeps_per_average) ||
+      sweeps_per_average < 1) {
+    stop("`sweeps_per_average` must be a single integer >= 1.", call. = FALSE)
+  }
+
+  sweeps_per_average <- as.integer(sweeps_per_average)
 
   df_work <- df_long
 
@@ -450,25 +421,34 @@ zeus_extract_features_legacy <- function(
     }
   }
 
-  group_keys <- c("sweep", "stim_nd", "stim_irradiance_log10")
+  # Sweep-level grouping keys for extraction
+  sweep_group_keys <- c("sweep", "stim_nd", "stim_irradiance_log10")
 
-  optional_keys <- c("stim_order", "stim_type", "wavelength",
-                     "treatment_group", "date_of_fertilization", "erg_age")
-  group_keys <- c(group_keys, optional_keys[optional_keys %in% names(df_work)])
+  optional_sweep_keys <- c(
+    "wavelength",
+    "treatment_group",
+    "date_of_fertilization",
+    "erg_age"
+  )
 
-  # noise from 300-400 ms
+  sweep_group_keys <- c(
+    sweep_group_keys,
+    optional_sweep_keys[optional_sweep_keys %in% names(df_work)]
+  )
+
+  # Noise from noise window
   noise_df <- df_work |>
     dplyr::filter(
       .data$time >= noise_window[1],
       .data$time <= noise_window[2]
     ) |>
-    dplyr::group_by(dplyr::across(dplyr::all_of(group_keys))) |>
+    dplyr::group_by(dplyr::across(dplyr::all_of(sweep_group_keys))) |>
     dplyr::summarise(
       noise = stats::sd(.data$value, na.rm = TRUE),
       .groups = "drop"
     )
 
-  # response window 400-700 ms
+  # Response window
   response_df <- df_work |>
     dplyr::filter(
       .data$time >= response_window[1],
@@ -477,41 +457,78 @@ zeus_extract_features_legacy <- function(
 
   # A-wave trough
   a_df <- response_df |>
-    dplyr::group_by(dplyr::across(dplyr::all_of(group_keys))) |>
+    dplyr::group_by(dplyr::across(dplyr::all_of(sweep_group_keys))) |>
     dplyr::slice_min(order_by = .data$value, n = 1, with_ties = FALSE) |>
     dplyr::ungroup() |>
     dplyr::transmute(
-      dplyr::across(dplyr::all_of(group_keys)),
+      dplyr::across(dplyr::all_of(sweep_group_keys)),
       awave = .data$value,
       troughtime = .data$time * 1000
     )
 
   # B-wave peak
   b_df <- response_df |>
-    dplyr::group_by(dplyr::across(dplyr::all_of(group_keys))) |>
+    dplyr::group_by(dplyr::across(dplyr::all_of(sweep_group_keys))) |>
     dplyr::slice_max(order_by = .data$value, n = 1, with_ties = FALSE) |>
     dplyr::ungroup() |>
     dplyr::transmute(
-      dplyr::across(dplyr::all_of(group_keys)),
+      dplyr::across(dplyr::all_of(sweep_group_keys)),
       bpeak = .data$value,
       peaktime = .data$time * 1000
     )
 
-  out <- a_df |>
-    dplyr::left_join(b_df, by = group_keys) |>
-    dplyr::left_join(noise_df, by = group_keys) |>
+  # Sweep-level legacy features
+  sweep_features <- a_df |>
+    dplyr::left_join(b_df, by = sweep_group_keys) |>
+    dplyr::left_join(noise_df, by = sweep_group_keys) |>
     dplyr::mutate(
       response = .data$bpeak - .data$awave
-    ) |>
-    dplyr::select(
-      dplyr::all_of(group_keys),
-      .data$response,
-      .data$noise,
-      .data$awave,
-      .data$peaktime,
-      .data$troughtime
-    ) |>
-    dplyr::arrange(dplyr::desc(.data$stim_nd), .data$sweep)
+    )
 
-  out
+  # Averaging keys: condition-level keys only
+  avg_group_keys <- c("stim_nd", "stim_irradiance_log10")
+
+  optional_avg_keys <- c(
+    "wavelength",
+    "treatment_group",
+    "date_of_fertilization",
+    "erg_age"
+  )
+
+  avg_group_keys <- c(
+    avg_group_keys,
+    optional_avg_keys[optional_avg_keys %in% names(sweep_features)]
+  )
+
+  # Assign repeat/block within each condition
+  averaged_features <- sweep_features |>
+    dplyr::arrange(dplyr::across(dplyr::all_of(avg_group_keys)), .data$sweep) |>
+    dplyr::group_by(dplyr::across(dplyr::all_of(avg_group_keys))) |>
+    dplyr::mutate(
+      protocol_repeat = ceiling(dplyr::row_number() / sweeps_per_average)
+    ) |>
+    dplyr::group_by(
+      dplyr::across(dplyr::all_of(avg_group_keys)),
+      .data$protocol_repeat
+    ) |>
+    dplyr::summarise(
+      response = mean(.data$response, na.rm = TRUE),
+      noise = mean(.data$noise, na.rm = TRUE),
+      awave = mean(.data$awave, na.rm = TRUE),
+      peaktime = mean(.data$peaktime, na.rm = TRUE),
+      troughtime = mean(.data$troughtime, na.rm = TRUE),
+      n_sweeps = dplyr::n(),
+      .groups = "drop"
+    )
+
+  # Legacy order: protocol repeat first, then descending ND
+  if ("wavelength" %in% names(averaged_features)) {
+    averaged_features <- averaged_features |>
+      dplyr::arrange(.data$protocol_repeat, .data$wavelength, dplyr::desc(.data$stim_nd))
+  } else {
+    averaged_features <- averaged_features |>
+      dplyr::arrange(.data$protocol_repeat, dplyr::desc(.data$stim_nd))
+  }
+
+  averaged_features
 }

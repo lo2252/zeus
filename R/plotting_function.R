@@ -61,7 +61,7 @@ zeus_plot_mean_waveform <- function(
 {
 
   # Input validation
-  required_cols <- c("time", "value_raw", "stim_nd")
+  required_cols <- c("time", "value", "stim_nd")
   missing_cols <- setdiff(required_cols, names(df_long))
 
   if (length(missing_cols) > 0) {
