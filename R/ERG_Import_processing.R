@@ -40,39 +40,119 @@ read_abf_raw <- function(path, ...) {
 
 # Import/Clean Data -------------------------------------------------------
 
-#' Read an ABF file and return a standardized long data frame
+#' Import and preprocess ABF electrophysiology data into ZEUS format
 #'
-#' @param x Either a file path to a .abf, or a `zeus_abf_raw` object.
-#' @param ... Passed to readABF::readABF() only when `x` is a file path.
-#' @param add_stim Logical; attach protocol stimulus columns?
-#' @param calib Optional calibration table passed to nd_to_irradiance_log10().
-#' @param protocol Character string specifying the protocol. Supported:
-#'   `"default"`, `"C1"`, `"C0"`.
-#' @param nd_start,nd_end,nd_step,repeats_per_level,n_protocol_repeats Protocol
-#'   settings used by `"default"` and `"C1"`. `"C0"` uses a fixed custom sequence.
-#' @param nd_descending Logical; if `TRUE`, default/C1 ND levels are assigned
-#'   from highest ND to lowest ND within each protocol repeat.
-#' @param treatment_group Treatment label. One of `"SYS Water"`, `"BPA"`,
-#'   `"DMSO"`, `"1-850"`, `"T3"`, `"ICI"`, `"EE2"`, `"BPA/ICI"`,
-#'   `"BPA/1-850"`, `"BPA/1-850/ICI"`, or `"user_input"`.
-#' @param treatment_group_custom Character string used when
-#'   `treatment_group = "user_input"`.
-#' @param date_of_fertilization Date of fertilization for the fish.
-#' @param erg_age Age at ERG, one of `"Larval"` or `"Adult"`.
-#' @param apply_boxcar Logical; if `TRUE`, applies a boxcar filter to selected
-#'   response channels before stimulus annotation. Default is `TRUE`.
-#' @param boxcar_channel_pattern Character string used to identify the channel
-#'   to smooth. Default is `"DAM80"`.
-#' @param boxcar_k Optional integer window size for the boxcar filter.
-#'   If `NULL`, the default ZEUS standard is used.
-#' @param boxcar_width Optional numeric smoothing width in the same units as
-#'   the `time` column. Used only when `boxcar_k` is `NULL`. If both
-#'   `boxcar_k` and `boxcar_width` are `NULL`, the ZEUS default 33-point
-#'   running average is used.
-#' @param keep_raw_boxcar Logical; if `TRUE`, stores the original unsmoothed
-#'   signal in a new column called `value_raw`. Default is `TRUE`.
+#' @description
+#' Imports Axon Binary Format (ABF) electrophysiology data and converts it into
+#' a standardized long-format data frame suitable for downstream analysis within
+#' the ZEUS framework.
 #'
-#' @return A tibble/data.frame in standardized long format.
+#' The function supports optional preprocessing steps including baseline
+#' correction and application of a legacy-style boxcar filter, as well as
+#' automatic assignment of stimulus protocol information and experimental
+#' metadata.
+#'
+#' @details
+#' The preprocessing pipeline proceeds in the following order:
+#' \enumerate{
+#'   \item Import ABF file using \code{read_abf_raw()}.
+#'   \item Convert to long-format data using \code{abf_as_df_long()}.
+#'   \item (Optional) Apply baseline correction using \code{zeus_baseline_correct()}.
+#'   \item (Optional) Apply a legacy 33-point boxcar filter using \code{zeus_boxcar_filter()}.
+#'   \item (Optional) Append stimulus protocol and metadata using
+#'         \code{add_stimulus_cols_protocol()}.
+#' }
+#'
+#' The boxcar filter is implemented as a fixed-width 33-point running average,
+#' corresponding to a 16.5 ms window when the sampling interval is 0.5 ms.
+#' Edge behavior is preserved to match legacy electrophysiology workflows,
+#' resulting in a constant-valued region at the beginning and end of each trace.
+#'
+#' Raw (unfiltered) signal values can optionally be preserved in a separate
+#' column (\code{value_raw}) when filtering is applied.
+#'
+#' @param x Either a file path to an ABF file or a \code{zeus_abf_raw} object.
+#'
+#' @param ... Additional arguments passed to \code{read_abf_raw()}.
+#'
+#' @param add_stim Logical; if \code{TRUE}, appends stimulus protocol
+#'   information to the output. Default is \code{TRUE}.
+#'
+#' @param calib Optional calibration data used for mapping stimulus ND values
+#'   to irradiance. If \code{NULL}, a default calibration is used.
+#'
+#' @param protocol Character string specifying the stimulus protocol.
+#'   Options include:
+#'   \itemize{
+#'     \item \code{"default"}: ND sweep from \code{nd_start} to \code{nd_end}
+#'     \item \code{"C1"}: constant wavelength protocol
+#'     \item \code{"C0"}: spectral protocol with wavelength-specific ND ordering
+#'   }
+#'
+#' @param nd_start Starting neutral density (ND) value. Default is \code{3.0}.
+#'
+#' @param nd_end Ending ND value. Default is \code{6.0}.
+#'
+#' @param nd_step Step size between ND levels. Default is \code{0.5}.
+#'
+#' @param repeats_per_level Number of sweeps per ND level. Default is \code{4}.
+#'
+#' @param n_protocol_repeats Number of full protocol repetitions. Default is \code{10}.
+#'
+#' @param nd_descending Logical; if \code{TRUE}, ND levels are ordered from high
+#'   to low intensity. Default is \code{TRUE}.
+#'
+#' @param treatment_group Character string specifying treatment condition.
+#'
+#' @param treatment_group_custom Optional custom label when
+#'   \code{treatment_group = "user_input"}.
+#'
+#' @param date_of_fertilization Date of fertilization for the sample. Can be
+#'   coerced using \code{as.Date()} or parsed externally.
+#'
+#' @param erg_age Character string specifying developmental stage (e.g.,
+#'   \code{"Larval"}, \code{"Adult"}).
+#'
+#' @param apply_baseline Logical; if \code{TRUE}, performs baseline correction
+#'   prior to filtering. Default is \code{FALSE}.
+#'
+#' @param baseline_window Numeric vector of length 2 specifying the time window
+#'   (in seconds) used for baseline estimation. Default is \code{c(0, 0.3)}.
+#'
+#' @param apply_boxcar Logical; if \code{TRUE}, applies a boxcar filter to the
+#'   signal. Default is \code{TRUE}.
+#'
+#' @param boxcar_channel_pattern Character string used to identify channels to
+#'   filter (e.g., \code{"DAM80"}). Default is \code{"DAM80"}.
+#'
+#' @param boxcar_k Integer window size for the running average. Default is
+#'   \code{33}. If \code{NULL}, defaults to 33.
+#'
+#' @param keep_raw_boxcar Logical; if \code{TRUE}, preserves original signal in
+#'   \code{value_raw}. Default is \code{TRUE}.
+#'
+#' @return A tibble in ZEUS long format containing:
+#' \itemize{
+#'   \item \code{sweep}: sweep index
+#'   \item \code{time}: time in seconds
+#'   \item \code{channel}: channel name
+#'   \item \code{value}: processed signal (baseline-corrected and/or filtered)
+#'   \item \code{value_raw}: original signal (if \code{keep_raw_boxcar = TRUE})
+#'   \item stimulus protocol columns (e.g., \code{stim_nd},
+#'         \code{stim_irradiance_log10})
+#'   \item metadata columns (e.g., \code{treatment_group}, \code{erg_age})
+#' }
+#'
+#' @examples
+#' \dontrun{
+#' df <- zeus_import(
+#'   "example.abf",
+#'   protocol = "C1",
+#'   treatment_group = "SYS Water",
+#'   erg_age = "Larval"
+#' )
+#' }
+#'
 #' @export
 zeus_import <- function(
     x,
@@ -224,10 +304,49 @@ abf_as_df_wide <- function(raw_abf) {
 
 
 # Baseline Correction -----------------------------------------------------
+#' Apply baseline correction to long-format ERG data
+#'
+#' @description
+#' Performs sweep-wise baseline correction by subtracting the mean signal value
+#' within a user-defined baseline window from all time points in each sweep and
+#' channel.
+#'
+#' This function is intended for use on ZEUS long-format data and is typically
+#' applied before smoothing and feature extraction.
+#'
+#' @details
+#' Baseline correction is performed independently for each combination of
+#' `sweep` and `channel`.
+#'
+#' For each sweep-channel pair, the baseline is defined as the mean of `value`
+#' within the interval specified by `baseline_window`. That baseline value is
+#' then subtracted from the full trace.
+#'
+#' If `keep_raw = TRUE`, the original uncorrected signal is preserved in a
+#' separate column named `value_raw`, while the corrected signal is stored in
+#' `value`.
+#'
+#' This function does not smooth the signal and does not modify stimulus or
+#' metadata columns.
+#'
+#' @param df_long A ZEUS long-format data frame. Must contain at minimum
+#'   `sweep`, `time`, `channel`, and `value`.
+#'
+#' @param baseline_window Numeric vector of length 2 giving the start and end
+#'   of the baseline window in the same units as `df_long$time`. Default is
+#'   `c(0, 0.3)`.
+#'
+#' @param keep_raw Logical; if `TRUE`, preserves the original uncorrected
+#'   signal in a separate column named `value_raw`. Default is `TRUE`.
+#'
+#' @return A data frame with baseline-corrected values stored in `value`.
+#'   If `keep_raw = TRUE`, the original signal is also retained in `value_raw`.
+#' @export
+zeus_baseline_correct <- function(df_long,
+                                  baseline_window = c(0, 0.3),
+                                  keep_raw = TRUE) {
 
-zeus_baseline_correct <- function(df_long, baseline_window = c(0, 0.3)) {
-
-  required_cols <- c("sweep", "time", "value")
+  required_cols <- c("sweep", "time", "channel", "value")
   missing_cols <- setdiff(required_cols, names(df_long))
 
   if (length(missing_cols) > 0) {
@@ -238,47 +357,78 @@ zeus_baseline_correct <- function(df_long, baseline_window = c(0, 0.3)) {
     )
   }
 
-  df_long |>
-    dplyr::group_by(sweep, channel) |>
+  if (!is.numeric(baseline_window) ||
+      length(baseline_window) != 2 ||
+      any(is.na(baseline_window)) ||
+      baseline_window[1] >= baseline_window[2]) {
+    stop(
+      "`baseline_window` must be a numeric vector of length 2 with start < end.",
+      call. = FALSE
+    )
+  }
+
+  df_out <- df_long
+
+  if (isTRUE(keep_raw) && !"value_raw" %in% names(df_out)) {
+    df_out$value_raw <- df_out$value
+  }
+
+  df_out |>
+    dplyr::group_by(.data$sweep, .data$channel) |>
     dplyr::mutate(
       baseline = mean(
-        value[time >= baseline_window[1] & time <= baseline_window[2]],
+        .data$value[
+          .data$time >= baseline_window[1] &
+            .data$time <= baseline_window[2]
+        ],
         na.rm = TRUE
       ),
-      value = value - baseline
+      value = .data$value - .data$baseline
     ) |>
     dplyr::ungroup() |>
-    dplyr::select(-baseline)
+    dplyr::select(-.data$baseline)
 }
 
 # Boxcar filter -----------------------------------------------------------
 
-#' Apply a boxcar filter to selected channels in long-format ABF data
+#' Apply a legacy-style boxcar filter to long-format ERG data
 #'
 #' @description
-#' Applies a centered moving-average (boxcar) filter to the `value` column
+#' Applies a fixed-width running-average (boxcar) filter to the `value` column
 #' within each sweep for channels matching `channel_pattern`.
 #'
-#' By default, this function applies an exact 33-point centered running average.
-#' When the sampling interval is 0.5 ms, this corresponds to a 16.5 ms boxcar
-#' filter as described by Deveau et al. (2020).
+#' This function is designed to reproduce a legacy electrophysiology filtering
+#' workflow using a 33-point running average. When the sampling interval is
+#' 0.5 ms, this corresponds to a 16.5 ms smoothing window.
 #'
-#' Edge values are handled using partial windows rather than replacing with the
-#' raw unsmoothed signal.
+#' @details
+#' The filter is applied independently within each sweep and channel.
 #'
-#' @param df_long Long-format ABF data.
-#' @param channel_pattern Character string identifying channel to smooth.
-#'   Default is `"DAM80"`.
-#' @param k Optional integer window size for the filter. Default is `33`.
-#'   If supplied, this takes priority over `boxcar_width`.
-#' @param boxcar_width Optional numeric smoothing width in the same units as
-#'   `df_long$time`. Used only when `k` is `NULL`.
-#' @param keep_raw Logical; if `TRUE`, store original signal in `value_raw`.
-#' @param warn_on_width_mismatch Logical; if `TRUE`, warn when the effective
-#'   width implied by `k` and the data sampling interval differs from the
-#'   requested `boxcar_width`.
+#' To preserve compatibility with the legacy workflow, edge handling uses a
+#' fixed-width window: near the beginning of a trace, the first full window is
+#' reused until the averaging window can slide normally; near the end of a
+#' trace, the last full window is reused similarly. This may produce a flat
+#' region at the start and end of the filtered waveform and is intentional.
 #'
-#' @return Data frame with smoothed `value`.
+#' If `keep_raw = TRUE`, the original unsmoothed signal is preserved in a
+#' separate column named `value_raw`, while the filtered signal is stored in
+#' `value`.
+#'
+#' @param df_long A ZEUS long-format data frame. Must contain at minimum
+#'   `sweep`, `time`, `channel`, and `value`.
+#'
+#' @param channel_pattern Character string used to identify the channel(s) to
+#'   filter. Default is `"DAM80"`.
+#'
+#' @param k Integer window size for the running average. Default is `33`.
+#'   Must be an odd positive integer.
+#'
+#' @param keep_raw Logical; if `TRUE`, the original signal is preserved in
+#'   `value_raw`. Default is `TRUE`.
+#'
+#' @return A data frame with the same structure as `df_long`, with filtered
+#'   values stored in `value`. If `keep_raw = TRUE`, the original signal is
+#'   retained in `value_raw`.
 #' @keywords internal
 zeus_boxcar_filter <- function(df_long,
                                channel_pattern = "DAM80",

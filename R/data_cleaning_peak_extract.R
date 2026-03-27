@@ -354,3 +354,164 @@ zeus_extract_features <- function(df_long,
 
   df_features
 }
+
+
+# Legacy Feature Extract --------------------------------------------------
+
+#' Extract legacy-style ERG response features
+#'
+#' @description
+#' Extracts sweep-level ERG features using a legacy-style workflow designed to
+#' reproduce historical response measurements.
+#'
+#' The function computes:
+#' \itemize{
+#'   \item noise within a baseline/noise window
+#'   \item A-wave trough amplitude within a response window
+#'   \item B-wave peak amplitude within the same response window
+#'   \item response amplitude as peak minus trough
+#'   \item peak time and trough time in milliseconds
+#' }
+#'
+#' @details
+#' This function is intended for compatibility with a legacy extraction method
+#' in which:
+#' \itemize{
+#'   \item noise is calculated from the `noise_window`
+#'   \item the A-wave trough is defined as the minimum value in the
+#'         `response_window`
+#'   \item the B-wave peak is defined as the maximum value in the
+#'         `response_window`
+#'   \item response amplitude is calculated as `bpeak - awave`
+#' }
+#'
+#' Unlike the more restrictive ZEUS feature extraction workflow, this legacy
+#' version does not require sequence-based validation between trough and peak
+#' and is intended specifically for reproducing historical output values.
+#'
+#' @param df_long A ZEUS long-format data frame. Must contain at minimum
+#'   `sweep`, `time`, `value`, `stim_nd`, and `stim_irradiance_log10`.
+#'
+#' @param channel_filter Optional character string specifying the channel to
+#'   analyze, such as `"ERG DAM80"`. If `NULL`, all rows are used.
+#'
+#' @param response_window Numeric vector of length 2 giving the response window
+#'   in seconds. Default is `c(0.4, 0.7)`.
+#'
+#' @param noise_window Numeric vector of length 2 giving the noise window in
+#'   seconds. Default is `c(0.3, 0.4)`.
+#'
+#' @return A tibble with one row per sweep containing:
+#' \itemize{
+#'   \item `stim_nd`
+#'   \item `stim_irradiance_log10`
+#'   \item `response` (B-wave peak minus A-wave trough)
+#'   \item `noise`
+#'   \item `awave`
+#'   \item `peaktime` (ms)
+#'   \item `troughtime` (ms)
+#' }
+#'
+#' Additional metadata columns present in the input, such as `stim_order`,
+#' `wavelength`, `treatment_group`, `date_of_fertilization`, and `erg_age`,
+#' are preserved when available.
+#'
+#' @export
+zeus_extract_features_legacy <- function(
+    df_long,
+    channel_filter = "ERG DAM80",
+    response_window = c(0.4, 0.7),
+    noise_window = c(0.3, 0.4)
+) {
+
+  required_cols <- c("sweep", "time", "value", "stim_nd", "stim_irradiance_log10")
+  missing_cols <- setdiff(required_cols, names(df_long))
+
+  if (length(missing_cols) > 0) {
+    stop(
+      "df_long is missing required columns: ",
+      paste(missing_cols, collapse = ", "),
+      call. = FALSE
+    )
+  }
+
+  df_work <- df_long
+
+  if (!is.null(channel_filter)) {
+    if (!"channel" %in% names(df_work)) {
+      stop("`channel_filter` supplied but no `channel` column found.", call. = FALSE)
+    }
+
+    df_work <- df_work |>
+      dplyr::filter(.data$channel == channel_filter)
+
+    if (nrow(df_work) == 0) {
+      stop("No rows remained after channel filtering.", call. = FALSE)
+    }
+  }
+
+  group_keys <- c("sweep", "stim_nd", "stim_irradiance_log10")
+
+  optional_keys <- c("stim_order", "stim_type", "wavelength",
+                     "treatment_group", "date_of_fertilization", "erg_age")
+  group_keys <- c(group_keys, optional_keys[optional_keys %in% names(df_work)])
+
+  # noise from 300-400 ms
+  noise_df <- df_work |>
+    dplyr::filter(
+      .data$time >= noise_window[1],
+      .data$time <= noise_window[2]
+    ) |>
+    dplyr::group_by(dplyr::across(dplyr::all_of(group_keys))) |>
+    dplyr::summarise(
+      noise = stats::sd(.data$value, na.rm = TRUE),
+      .groups = "drop"
+    )
+
+  # response window 400-700 ms
+  response_df <- df_work |>
+    dplyr::filter(
+      .data$time >= response_window[1],
+      .data$time <= response_window[2]
+    )
+
+  # A-wave trough
+  a_df <- response_df |>
+    dplyr::group_by(dplyr::across(dplyr::all_of(group_keys))) |>
+    dplyr::slice_min(order_by = .data$value, n = 1, with_ties = FALSE) |>
+    dplyr::ungroup() |>
+    dplyr::transmute(
+      dplyr::across(dplyr::all_of(group_keys)),
+      awave = .data$value,
+      troughtime = .data$time * 1000
+    )
+
+  # B-wave peak
+  b_df <- response_df |>
+    dplyr::group_by(dplyr::across(dplyr::all_of(group_keys))) |>
+    dplyr::slice_max(order_by = .data$value, n = 1, with_ties = FALSE) |>
+    dplyr::ungroup() |>
+    dplyr::transmute(
+      dplyr::across(dplyr::all_of(group_keys)),
+      bpeak = .data$value,
+      peaktime = .data$time * 1000
+    )
+
+  out <- a_df |>
+    dplyr::left_join(b_df, by = group_keys) |>
+    dplyr::left_join(noise_df, by = group_keys) |>
+    dplyr::mutate(
+      response = .data$bpeak - .data$awave
+    ) |>
+    dplyr::select(
+      dplyr::all_of(group_keys),
+      .data$response,
+      .data$noise,
+      .data$awave,
+      .data$peaktime,
+      .data$troughtime
+    ) |>
+    dplyr::arrange(dplyr::desc(.data$stim_nd), .data$sweep)
+
+  out
+}
