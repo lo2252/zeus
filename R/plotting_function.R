@@ -248,23 +248,77 @@ zeus_plot_mean_waveform <- function(
   if (isTRUE(overlay_markers) && isTRUE(include_overall)) {
     overall_for_markers <- df_overall |>
       dplyr::filter(.data$signal_type == "Smoothed") |>
-      dplyr::select(.data$time, .data$signal)
+      dplyr::select(.data$time, .data$signal) |>
+      dplyr::arrange(.data$time)
 
-    get_marker <- function(data, window, type, extreme_fn) {
-      data |>
-        dplyr::filter(.data$time >= window[1], .data$time <= window[2]) |>
-        extreme_fn(order_by = .data$signal, n = 1, with_ties = FALSE) |>
+    # A-wave trough
+    a_marker <- overall_for_markers |>
+      dplyr::filter(.data$time >= a_window[1], .data$time <= a_window[2]) |>
+      dplyr::slice_min(order_by = .data$signal, n = 1, with_ties = FALSE) |>
+      dplyr::transmute(
+        marker_type = "A-wave trough",
+        time_ms = .data$time * 1000
+      )
+
+    # B-wave peak after A-wave trough
+    a_time <- a_marker$time_ms / 1000
+    b_marker <- overall_for_markers |>
+      dplyr::filter(
+        .data$time >= max(b_window[1], a_time),
+        .data$time <= b_window[2]
+      ) |>
+      dplyr::slice_max(order_by = .data$signal, n = 1, with_ties = FALSE) |>
+      dplyr::transmute(
+        marker_type = "B-wave peak",
+        time_ms = .data$time * 1000
+      )
+
+    # D-wave: find trough in early d-window, then peak after trough
+    d_marker <- dplyr::tibble(
+      marker_type = "D-wave peak",
+      time_ms = NA_real_
+    )
+
+    d_window_width <- diff(d_window)
+    d_trough_end <- d_window[1] + (d_window_width * 0.4)
+
+    d_trough <- overall_for_markers |>
+      dplyr::filter(
+        .data$time >= d_window[1],
+        .data$time <= d_trough_end
+      ) |>
+      dplyr::slice_min(order_by = .data$signal, n = 1, with_ties = FALSE)
+
+    if (nrow(d_trough) == 1) {
+      d_peak <- overall_for_markers |>
+        dplyr::filter(
+          .data$time > d_trough$time,
+          .data$time <= d_window[2]
+        ) |>
+        dplyr::slice_max(order_by = .data$signal, n = 1, with_ties = FALSE)
+
+      if (nrow(d_peak) == 1) {
+        d_marker <- d_peak |>
+          dplyr::transmute(
+            marker_type = "D-wave peak",
+            time_ms = .data$time * 1000
+          )
+      }
+    }
+
+    # If no D-wave peak found, use max in full d-window
+    if (all(is.na(d_marker$time_ms))) {
+      d_marker <- overall_for_markers |>
+        dplyr::filter(.data$time >= d_window[1], .data$time <= d_window[2]) |>
+        dplyr::slice_max(order_by = .data$signal, n = 1, with_ties = FALSE) |>
         dplyr::transmute(
-          marker_type = type,
+          marker_type = "D-wave peak",
           time_ms = .data$time * 1000
         )
     }
 
-    marker_lines <- dplyr::bind_rows(
-      get_marker(overall_for_markers, a_window, "A-wave trough", dplyr::slice_min),
-      get_marker(overall_for_markers, b_window, "B-wave peak", dplyr::slice_max),
-      get_marker(overall_for_markers, d_window, "D-wave peak", dplyr::slice_max)
-    ) |>
+    marker_lines <- dplyr::bind_rows(a_marker, b_marker, d_marker) |>
+      dplyr::filter(!is.na(.data$time_ms)) |>
       dplyr::mutate(
         marker_type = factor(
           .data$marker_type,
@@ -294,7 +348,7 @@ zeus_plot_mean_waveform <- function(
       )
   }
 
-  # Final formating
+  # Final formatting
   color_values <- c(nd_colors, "Overall Mean" = overall_color)
   color_breaks <- c(stim_levels_chr, if (isTRUE(include_overall)) "Overall Mean")
 
@@ -360,7 +414,6 @@ zeus_plot_mean_waveform <- function(
       axis.ticks = ggplot2::element_line(linewidth = 0.5)
     )
 }
-
 
 # Intensity Response by ND -----------------------------------------------------
 
