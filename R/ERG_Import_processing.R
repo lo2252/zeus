@@ -40,119 +40,71 @@ read_abf_raw <- function(path, ...) {
 
 # Import/Clean Data -------------------------------------------------------
 
-#' Import and preprocess ABF electrophysiology data into ZEUS format
-#'
 #' @description
 #' Imports Axon Binary Format (ABF) electrophysiology data and converts it into
 #' a standardized long-format data frame suitable for downstream analysis within
-#' the ZEUS framework.
+#' ZEUS.
 #'
-#' The function supports optional preprocessing steps including baseline
-#' correction and application of a legacy-style boxcar filter, as well as
-#' automatic assignment of stimulus protocol information and experimental
-#' metadata.
-#'
-#' @details
-#' The preprocessing pipeline proceeds in the following order:
+#' The import workflow can:
 #' \enumerate{
-#'   \item Import ABF file using \code{read_abf_raw()}.
-#'   \item Convert to long-format data using \code{abf_as_df_long()}.
-#'   \item (Optional) Apply baseline correction using \code{zeus_baseline_correct()}.
-#'   \item (Optional) Apply a legacy 33-point boxcar filter using \code{zeus_boxcar_filter()}.
-#'   \item (Optional) Append stimulus protocol and metadata using
-#'         \code{add_stimulus_cols_protocol()}.
+#'   \item read raw ABF data,
+#'   \item convert the file to ZEUS long format,
+#'   \item append stimulus metadata,
+#'   \item assign protocol repeats,
+#'   \item average technical replicates,
+#'   \item apply a 33-point boxcar filter to selected channels,
+#'   \item apply baseline correction to selected channels.
 #' }
 #'
-#' The boxcar filter is implemented as a fixed-width 33-point running average,
-#' corresponding to a 16.5 ms window when the sampling interval is 0.5 ms.
-#' Edge behavior is preserved to match legacy electrophysiology workflows,
-#' resulting in a constant-valued region at the beginning and end of each trace.
+#' Replicate averaging preserves all channels by default, including the
+#' photocell channel, so stimulus alignment and plotting remain available after
+#' preprocessing.
 #'
-#' Raw (unfiltered) signal values can optionally be preserved in a separate
-#' column (\code{value_raw}) when filtering is applied.
+#' @param x Either a file path to a `.abf` file, or a `zeus_abf_raw` object.
+#' @param ... Passed to `readABF::readABF()` only when `x` is a file path.
+#' @param add_stim Logical; if `TRUE`, attach stimulus protocol metadata.
+#' @param calib Optional calibration table passed to `nd_to_irradiance_log10()`.
+#' @param protocol Character string specifying the protocol. Supported:
+#'   `"default"`, `"C1"`, `"C0"`.
+#' @param nd_start,nd_end,nd_step,repeats_per_level,n_protocol_repeats Protocol
+#'   settings used by `"default"` and `"C1"`. `"C0"` uses a fixed custom
+#'   sequence.
+#' @param nd_descending Logical; if `TRUE`, protocol ND values are assigned in
+#'   descending order.
+#' @param treatment_group Treatment label.
+#' @param treatment_group_custom Custom label used when
+#'   `treatment_group = "user_input"`.
+#' @param date_of_fertilization Date of fertilization for the sample.
+#' @param erg_age Age at ERG, such as `"Larval"` or `"Adult"`.
+#' @param drop_unmatched_sweeps Logical; if `TRUE`, remove sweeps that do not
+#'   map to the protocol table.
+#' @param average_replicates Logical; if `TRUE`, collapse repeated sweeps into
+#'   technical replicate mean waveforms.
+#' @param replicate_channel_filter Optional character string specifying which
+#'   channel(s) to average. Default is `NULL`, which preserves all channels.
+#' @param sweeps_per_replicate Number of repeated sweeps per technical replicate.
+#'   Default is `4`.
+#' @param add_protocol_repeat Logical; if `TRUE`, add `protocol_repeat` and
+#'   `protocol_repeat_rev` columns when protocol metadata are available.
+#' @param apply_boxcar Logical; if `TRUE`, apply the validated 33-point boxcar
+#'   to channels matching `boxcar_channel_pattern`.
+#' @param boxcar_channel_pattern Character string identifying channels to boxcar
+#'   filter. Default is `"DAM80"`.
+#' @param boxcar_k Integer boxcar width. Default is `33`.
+#' @param keep_raw_boxcar Logical; if `TRUE`, preserve the pre-filter signal in
+#'   `value_raw`.
+#' @param processing_mode Character string controlling replicate-level
+#'   correction. One of `"none"`, `"stimresp"`, or `"analysis"`.
+#' @param stimresp_offset Optional numeric constant offset subtracted from the
+#'   smoothed waveform in `"stimresp"` mode. If `NULL`, no constant offset is
+#'   applied automatically.
+#' @param baseline_window Numeric length-2 vector specifying the baseline
+#'   interval in seconds for `"analysis"` mode. Default is `c(0.300, 0.400)`.
+#' @param baseline_channel_pattern Character string identifying channels to
+#'   baseline correct. Default is `"DAM80"`.
 #'
-#' @param x Either a file path to an ABF file or a \code{zeus_abf_raw} object.
-#'
-#' @param ... Additional arguments passed to \code{read_abf_raw()}.
-#'
-#' @param add_stim Logical; if \code{TRUE}, appends stimulus protocol
-#'   information to the output. Default is \code{TRUE}.
-#'
-#' @param calib Optional calibration data used for mapping stimulus ND values
-#'   to irradiance. If \code{NULL}, a default calibration is used.
-#'
-#' @param protocol Character string specifying the stimulus protocol.
-#'   Options include:
-#'   \itemize{
-#'     \item \code{"default"}: ND sweep from \code{nd_start} to \code{nd_end}
-#'     \item \code{"C1"}: constant wavelength protocol
-#'     \item \code{"C0"}: spectral protocol with wavelength-specific ND ordering
-#'   }
-#'
-#' @param nd_start Starting neutral density (ND) value. Default is \code{3.0}.
-#'
-#' @param nd_end Ending ND value. Default is \code{6.0}.
-#'
-#' @param nd_step Step size between ND levels. Default is \code{0.5}.
-#'
-#' @param repeats_per_level Number of sweeps per ND level. Default is \code{4}.
-#'
-#' @param n_protocol_repeats Number of full protocol repetitions. Default is \code{10}.
-#'
-#' @param nd_descending Logical; if \code{TRUE}, ND levels are ordered from high
-#'   to low intensity. Default is \code{TRUE}.
-#'
-#' @param treatment_group Character string specifying treatment condition.
-#'
-#' @param treatment_group_custom Optional custom label when
-#'   \code{treatment_group = "user_input"}.
-#'
-#' @param date_of_fertilization Date of fertilization for the sample. Can be
-#'   coerced using \code{as.Date()} or parsed externally.
-#'
-#' @param erg_age Character string specifying developmental stage (e.g.,
-#'   \code{"Larval"}, \code{"Adult"}).
-#'
-#' @param apply_baseline Logical; if \code{TRUE}, performs baseline correction
-#'   prior to filtering. Default is \code{FALSE}.
-#'
-#' @param baseline_window Numeric vector of length 2 specifying the time window
-#'   (in seconds) used for baseline estimation. Default is \code{c(0, 0.3)}.
-#'
-#' @param apply_boxcar Logical; if \code{TRUE}, applies a boxcar filter to the
-#'   signal. Default is \code{TRUE}.
-#'
-#' @param boxcar_channel_pattern Character string used to identify channels to
-#'   filter (e.g., \code{"DAM80"}). Default is \code{"DAM80"}.
-#'
-#' @param boxcar_k Integer window size for the running average. Default is
-#'   \code{33}. If \code{NULL}, defaults to 33.
-#'
-#' @param keep_raw_boxcar Logical; if \code{TRUE}, preserves original signal in
-#'   \code{value_raw}. Default is \code{TRUE}.
-#'
-#' @return A tibble in ZEUS long format containing:
-#' \itemize{
-#'   \item \code{sweep}: sweep index
-#'   \item \code{time}: time in seconds
-#'   \item \code{channel}: channel name
-#'   \item \code{value}: processed signal (baseline-corrected and/or filtered)
-#'   \item \code{value_raw}: original signal (if \code{keep_raw_boxcar = TRUE})
-#'   \item stimulus protocol columns (e.g., \code{stim_nd},
-#'         \code{stim_irradiance_log10})
-#'   \item metadata columns (e.g., \code{treatment_group}, \code{erg_age})
-#' }
-#'
-#' @examples
-#' \dontrun{
-#' df <- zeus_import(
-#'   "example.abf",
-#'   protocol = "C1",
-#'   treatment_group = "SYS Water",
-#'   erg_age = "Larval"
-#' )
-#' }
-#'
+#' @return A long-format tibble. Depending on options, output may be sweep-level
+#'   or replicate-level.
 #' @export
 zeus_import <- function(
     x,
@@ -170,15 +122,23 @@ zeus_import <- function(
     treatment_group_custom = NULL,
     date_of_fertilization = NA,
     erg_age = NULL,
-    apply_baseline = TRUE,
-    baseline_window = c(0, 0.3),
-    apply_boxcar = TRUE,
+    drop_unmatched_sweeps = TRUE,
+    average_replicates = FALSE,
+    replicate_channel_filter = NULL,
+    sweeps_per_replicate = 4,
+    add_protocol_repeat = TRUE,
+    apply_boxcar = FALSE,
     boxcar_channel_pattern = "DAM80",
-    boxcar_k = NULL,
-    keep_raw_boxcar = TRUE
+    boxcar_k = 33,
+    keep_raw_boxcar = TRUE,
+    processing_mode = c("none", "stimresp", "analysis"),
+    stimresp_offset = NULL,
+    baseline_window = c(0.300, 0.400),
+    baseline_channel_pattern = "DAM80"
 ) {
 
   protocol <- match.arg(protocol)
+  processing_mode <- match.arg(processing_mode)
 
   if (inherits(x, "zeus_abf_raw")) {
     raw_abf <- x$raw
@@ -190,25 +150,6 @@ zeus_import <- function(
 
   df_long <- abf_as_df_long(raw_abf)
 
-  # Apply baseline
-  if (isTRUE(apply_baseline)) {
-    df_long <- zeus_baseline_correct(
-      df_long = df_long,
-      baseline_window = baseline_window
-    )
-  }
-
-  # Apply Boxcar
-  if (isTRUE(apply_boxcar)) {
-    df_long <- zeus_boxcar_filter(
-      df_long,
-      channel_pattern = boxcar_channel_pattern,
-      k = if (is.null(boxcar_k)) 33 else boxcar_k,
-      keep_raw = keep_raw_boxcar
-    )
-  }
-
-  # Add stim protocol
   if (isTRUE(add_stim)) {
     df_long <- add_stimulus_cols_protocol(
       df_long = df_long,
@@ -225,12 +166,89 @@ zeus_import <- function(
       date_of_fertilization = date_of_fertilization,
       erg_age = erg_age
     )
+
+    if (isTRUE(drop_unmatched_sweeps) && "stim_nd" %in% names(df_long)) {
+      df_long <- df_long |>
+        dplyr::filter(!is.na(.data$stim_nd))
+    }
+
+    if (isTRUE(add_protocol_repeat) && "stim_order" %in% names(df_long)) {
+      sweeps_per_protocol <- length(
+        unique(
+          make_protocol_table(
+            protocol = protocol,
+            nd_start = nd_start,
+            nd_end = nd_end,
+            nd_step = nd_step,
+            repeats_per_level = repeats_per_level,
+            n_protocol_repeats = 1
+          )$stim_order
+        )
+      )
+
+      if (is.finite(sweeps_per_protocol) && sweeps_per_protocol > 0) {
+        sweep_map <- df_long |>
+          dplyr::distinct(.data$sweep, .data$stim_order) |>
+          dplyr::arrange(.data$sweep) |>
+          dplyr::mutate(
+            protocol_repeat = ceiling(.data$stim_order / sweeps_per_protocol)
+          )
+
+        max_rep <- max(sweep_map$protocol_repeat, na.rm = TRUE)
+
+        sweep_map <- sweep_map |>
+          dplyr::mutate(
+            protocol_repeat_rev = max_rep + 1 - .data$protocol_repeat
+          )
+
+        df_long <- df_long |>
+          dplyr::left_join(sweep_map, by = c("sweep", "stim_order"))
+      }
+    }
   }
 
+  if (isTRUE(average_replicates)) {
+    df_long <- zeus_average_technical_replicates(
+      df_long = df_long,
+      sweeps_per_replicate = sweeps_per_replicate,
+      channel_filter = replicate_channel_filter
+    )
+
+    if (isTRUE(apply_boxcar)) {
+      df_long <- zeus_boxcar_filter(
+        df_long = df_long,
+        channel_pattern = boxcar_channel_pattern,
+        k = boxcar_k,
+        keep_raw = keep_raw_boxcar
+      )
+    }
+
+    if (processing_mode == "analysis") {
+      df_long <- zeus_baseline_correct(
+        df_long = df_long,
+        baseline_window = baseline_window,
+        keep_raw = keep_raw_boxcar,
+        channel_pattern = baseline_channel_pattern
+      )
+    }
+
+    if (processing_mode == "stimresp" && !is.null(stimresp_offset)) {
+      if (!is.numeric(stimresp_offset) || length(stimresp_offset) != 1 || is.na(stimresp_offset)) {
+        stop("`stimresp_offset` must be a single non-missing numeric value.", call. = FALSE)
+      }
+
+      if ("channel" %in% names(df_long)) {
+        idx <- grepl(boxcar_channel_pattern, df_long$channel)
+      } else {
+        idx <- rep(TRUE, nrow(df_long))
+      }
+
+      df_long$value[idx] <- df_long$value[idx] - stimresp_offset
+    }
+  }
 
   df_long
 }
-
 # Convert to long DF -----------------------------------------------------------
 
 #' Convert readABF output to a standardized long data frame
@@ -302,51 +320,26 @@ abf_as_df_wide <- function(raw_abf) {
   })
 }
 
+# Averaging Technical Replicates ------------------------------------------
 
-# Baseline Correction -----------------------------------------------------
-#' Apply baseline correction to long-format ERG data
+#' Average technical replicates into replicate-level waveforms
 #'
 #' @description
-#' Performs sweep-wise baseline correction by subtracting the mean signal value
-#' within a user-defined baseline window from all time points in each sweep and
-#' channel.
+#' Collapses repeated sweeps into technical replicate mean waveforms. By default,
+#' all channels are preserved, including photocell channels. If a
+#' `channel_filter` is supplied, only matching channels are averaged.
 #'
-#' This function is intended for use on ZEUS long-format data and is typically
-#' applied before smoothing and feature extraction.
+#' @param df_long ZEUS long-format data.
+#' @param sweeps_per_replicate Number of sweeps per technical replicate.
+#' @param channel_filter Optional channel to average. Default is `NULL`.
 #'
-#' @details
-#' Baseline correction is performed independently for each combination of
-#' `sweep` and `channel`.
-#'
-#' For each sweep-channel pair, the baseline is defined as the mean of `value`
-#' within the interval specified by `baseline_window`. That baseline value is
-#' then subtracted from the full trace.
-#'
-#' If `keep_raw = TRUE`, the original uncorrected signal is preserved in a
-#' separate column named `value_raw`, while the corrected signal is stored in
-#' `value`.
-#'
-#' This function does not smooth the signal and does not modify stimulus or
-#' metadata columns.
-#'
-#' @param df_long A ZEUS long-format data frame. Must contain at minimum
-#'   `sweep`, `time`, `channel`, and `value`.
-#'
-#' @param baseline_window Numeric vector of length 2 giving the start and end
-#'   of the baseline window in the same units as `df_long$time`. Default is
-#'   `c(0, 0.3)`.
-#'
-#' @param keep_raw Logical; if `TRUE`, preserves the original uncorrected
-#'   signal in a separate column named `value_raw`. Default is `TRUE`.
-#'
-#' @return A data frame with baseline-corrected values stored in `value`.
-#'   If `keep_raw = TRUE`, the original signal is also retained in `value_raw`.
-#' @export
-zeus_baseline_correct <- function(df_long,
-                                  baseline_window = c(0, 0.3),
-                                  keep_raw = TRUE) {
+#' @return A long-format tibble with one waveform per technical replicate.
+#' @keywords internal
+zeus_average_technical_replicates <- function(df_long,
+                                              sweeps_per_replicate = 4,
+                                              channel_filter = NULL) {
 
-  required_cols <- c("sweep", "time", "channel", "value")
+  required_cols <- c("sweep", "time", "value")
   missing_cols <- setdiff(required_cols, names(df_long))
 
   if (length(missing_cols) > 0) {
@@ -357,12 +350,82 @@ zeus_baseline_correct <- function(df_long,
     )
   }
 
-  if (!is.numeric(baseline_window) ||
-      length(baseline_window) != 2 ||
-      any(is.na(baseline_window)) ||
-      baseline_window[1] >= baseline_window[2]) {
+  df_work <- df_long
+
+  if (!is.null(channel_filter)) {
+    if (!"channel" %in% names(df_work)) {
+      stop("`channel_filter` supplied but no `channel` column found.", call. = FALSE)
+    }
+
+    df_work <- df_work |>
+      dplyr::filter(.data$channel == channel_filter)
+  }
+
+  if (nrow(df_work) == 0) {
+    stop("No rows remained after channel filtering.", call. = FALSE)
+  }
+
+  grouping_keys <- c("stim_nd")
+  grouping_keys <- c(grouping_keys, intersect(
+    c(
+      "stim_irradiance_log10",
+      "wavelength",
+      "treatment_group",
+      "date_of_fertilization",
+      "erg_age",
+      "protocol_repeat",
+      "protocol_repeat_rev"
+    ),
+    names(df_work)
+  ))
+
+  rep_map <- df_work |>
+    dplyr::distinct(.data$sweep, dplyr::across(dplyr::all_of(grouping_keys))) |>
+    dplyr::arrange(dplyr::across(dplyr::all_of(grouping_keys)), .data$sweep) |>
+    dplyr::group_by(dplyr::across(dplyr::all_of(grouping_keys))) |>
+    dplyr::mutate(
+      tech_rep = ceiling(dplyr::row_number() / sweeps_per_replicate)
+    ) |>
+    dplyr::ungroup()
+
+  avg_group_keys <- c(grouping_keys, "tech_rep", "time")
+  if ("channel" %in% names(df_work)) avg_group_keys <- c(avg_group_keys, "channel")
+  if ("units" %in% names(df_work)) avg_group_keys <- c(avg_group_keys, "units")
+
+  df_work |>
+    dplyr::left_join(rep_map, by = c("sweep", grouping_keys)) |>
+    dplyr::group_by(dplyr::across(dplyr::all_of(avg_group_keys))) |>
+    dplyr::summarise(
+      value = mean(.data$value, na.rm = TRUE),
+      .groups = "drop"
+    ) |>
+    dplyr::mutate(
+      sweep = .data$tech_rep
+    ) |>
+    dplyr::relocate(.data$sweep, .before = .data$time)
+}
+
+# Baseline Correction -----------------------------------------------------
+#' Apply baseline correction to long-format ERG data
+#'
+#' @param df_long ZEUS long-format data.
+#' @param baseline_window Numeric length-2 vector in seconds.
+#' @param keep_raw Logical; if `TRUE`, preserve original signal in `value_raw`.
+#'
+#' @return Baseline-corrected data.
+#' @export
+zeus_baseline_correct <- function(df_long,
+                                  baseline_window = c(0.300, 0.400),
+                                  keep_raw = TRUE,
+                                  channel_pattern = "DAM80") {
+
+  required_cols <- c("sweep", "time", "value")
+  missing_cols <- setdiff(required_cols, names(df_long))
+
+  if (length(missing_cols) > 0) {
     stop(
-      "`baseline_window` must be a numeric vector of length 2 with start < end.",
+      "df_long is missing required columns: ",
+      paste(missing_cols, collapse = ", "),
       call. = FALSE
     )
   }
@@ -373,8 +436,26 @@ zeus_baseline_correct <- function(df_long,
     df_out$value_raw <- df_out$value
   }
 
-  df_out |>
-    dplyr::group_by(.data$sweep, .data$channel) |>
+  if ("channel" %in% names(df_out)) {
+    idx <- grepl(channel_pattern, df_out$channel)
+  } else {
+    idx <- rep(TRUE, nrow(df_out))
+  }
+
+  if (!any(idx)) {
+    return(df_out)
+  }
+
+  grouping_keys <- intersect(
+    c("sweep", "stim_nd", "tech_rep", "wavelength", "protocol_repeat", "protocol_repeat_rev", "channel"),
+    names(df_out)
+  )
+
+  df_target <- df_out[idx, , drop = FALSE]
+  df_other  <- df_out[!idx, , drop = FALSE]
+
+  df_target <- df_target |>
+    dplyr::group_by(dplyr::across(dplyr::all_of(grouping_keys))) |>
     dplyr::mutate(
       baseline = mean(
         .data$value[
@@ -387,6 +468,9 @@ zeus_baseline_correct <- function(df_long,
     ) |>
     dplyr::ungroup() |>
     dplyr::select(-.data$baseline)
+
+  dplyr::bind_rows(df_target, df_other) |>
+    dplyr::arrange(dplyr::across(dplyr::all_of(grouping_keys)), .data$time)
 }
 
 # Boxcar filter -----------------------------------------------------------
@@ -395,47 +479,21 @@ zeus_baseline_correct <- function(df_long,
 #'
 #' @description
 #' Applies a fixed-width running-average (boxcar) filter to the `value` column
-#' within each sweep for channels matching `channel_pattern`.
+#' within each replicate waveform for channels matching `channel_pattern`.
 #'
-#' This function is designed to reproduce a legacy electrophysiology filtering
-#' workflow using a 33-point running average. When the sampling interval is
-#' 0.5 ms, this corresponds to a 16.5 ms smoothing window.
+#' @param df_long ZEUS long-format data.
+#' @param channel_pattern Character string identifying channel(s) to filter.
+#' @param k Integer window size. Default is `33`.
+#' @param keep_raw Logical; if `TRUE`, preserve original signal in `value_raw`.
 #'
-#' @details
-#' The filter is applied independently within each sweep and channel.
-#'
-#' To preserve compatibility with the legacy workflow, edge handling uses a
-#' fixed-width window: near the beginning of a trace, the first full window is
-#' reused until the averaging window can slide normally; near the end of a
-#' trace, the last full window is reused similarly. This may produce a flat
-#' region at the start and end of the filtered waveform and is intentional.
-#'
-#' If `keep_raw = TRUE`, the original unsmoothed signal is preserved in a
-#' separate column named `value_raw`, while the filtered signal is stored in
-#' `value`.
-#'
-#' @param df_long A ZEUS long-format data frame. Must contain at minimum
-#'   `sweep`, `time`, `channel`, and `value`.
-#'
-#' @param channel_pattern Character string used to identify the channel(s) to
-#'   filter. Default is `"DAM80"`.
-#'
-#' @param k Integer window size for the running average. Default is `33`.
-#'   Must be an odd positive integer.
-#'
-#' @param keep_raw Logical; if `TRUE`, the original signal is preserved in
-#'   `value_raw`. Default is `TRUE`.
-#'
-#' @return A data frame with the same structure as `df_long`, with filtered
-#'   values stored in `value`. If `keep_raw = TRUE`, the original signal is
-#'   retained in `value_raw`.
-#' @keywords internal
+#' @return Filtered data.
+#' @export
 zeus_boxcar_filter <- function(df_long,
                                channel_pattern = "DAM80",
                                k = 33,
                                keep_raw = TRUE) {
 
-  required_cols <- c("sweep", "time", "channel", "value")
+  required_cols <- c("sweep", "time", "value")
   missing_cols <- setdiff(required_cols, names(df_long))
 
   if (length(missing_cols) > 0) {
@@ -446,44 +504,30 @@ zeus_boxcar_filter <- function(df_long,
     )
   }
 
-  if (!is.numeric(k) || length(k) != 1 || is.na(k) || k < 1) {
-    stop("`k` must be a single integer >= 1.", call. = FALSE)
+  df_out <- df_long
+
+  if (isTRUE(keep_raw) && !"value_raw" %in% names(df_out)) {
+    df_out$value_raw <- df_out$value
   }
 
-  k <- as.integer(k)
-
-  if (k %% 2 == 0) {
-    stop("`k` must be odd for the legacy symmetric running average.", call. = FALSE)
+  if ("channel" %in% names(df_out)) {
+    idx <- grepl(channel_pattern, df_out$channel)
+  } else {
+    idx <- rep(TRUE, nrow(df_out))
   }
-
-  idx <- grepl(channel_pattern, df_long$channel)
 
   if (!any(idx)) {
-    if (isTRUE(keep_raw) && !"value_raw" %in% names(df_long)) {
-      df_long$value_raw <- df_long$value
-    }
-    return(df_long)
+    return(df_out)
   }
 
-  df_target <- df_long[idx, , drop = FALSE]
-  df_other  <- df_long[!idx, , drop = FALSE]
-
-  if (isTRUE(keep_raw) && !"value_raw" %in% names(df_target)) {
-    df_target$value_raw <- df_target$value
-  }
-
-  if (isTRUE(keep_raw) && !"value_raw" %in% names(df_other)) {
-    df_other$value_raw <- df_other$value
-  }
-
-  legacy_boxcar <- function(x, k) {
+  legacy_boxcar_fixed <- function(x, k = 33) {
     n <- length(x)
     out <- numeric(n)
     half_k <- (k - 1L) %/% 2L
 
     for (i in seq_len(n)) {
       start_idx <- i - half_k
-      end_idx   <- i + half_k
+      end_idx <- i + half_k
 
       if (start_idx < 1L) {
         start_idx <- 1L
@@ -501,22 +545,24 @@ zeus_boxcar_filter <- function(df_long,
     out
   }
 
-  split_groups <- split(
-    df_target,
-    interaction(df_target$sweep, df_target$channel, drop = TRUE)
+  grouping_keys <- intersect(
+    c("sweep", "stim_nd", "tech_rep", "wavelength", "protocol_repeat", "protocol_repeat_rev", "channel"),
+    names(df_out)
   )
 
-  filtered_groups <- lapply(split_groups, function(dat) {
-    dat <- dat[order(dat$time), , drop = FALSE]
-    dat$value <- legacy_boxcar(dat$value, k = k)
-    dat
-  })
+  df_target <- df_out[idx, , drop = FALSE]
+  df_other  <- df_out[!idx, , drop = FALSE]
 
-  out <- do.call(rbind, c(filtered_groups, list(df_other)))
-  out <- out[order(out$sweep, out$channel, out$time), , drop = FALSE]
-  rownames(out) <- NULL
+  df_target <- df_target |>
+    dplyr::group_by(dplyr::across(dplyr::all_of(grouping_keys))) |>
+    dplyr::arrange(.data$time, .by_group = TRUE) |>
+    dplyr::mutate(
+      value = legacy_boxcar_fixed(.data$value, k = k)
+    ) |>
+    dplyr::ungroup()
 
-  out
+  dplyr::bind_rows(df_target, df_other) |>
+    dplyr::arrange(dplyr::across(dplyr::all_of(grouping_keys)), .data$time)
 }
 
 # Calibration table ------------------------------------------------------------
