@@ -45,15 +45,20 @@ zeus_plot_mean_waveform <- function(
     channel_filter = NULL,
     compare_raw = FALSE,
     include_overall = TRUE,
-    overlay_markers = TRUE,
+    overlay_markers = FALSE,
+    include_photocell = TRUE,
+    photocell_filter = "Photocell",
+    photocell_color = "black",
+    photocell_auto_scale = TRUE,
+    photocell_relative_height = 1.0,
     a_window = c(0.4, 0.7),
     b_window = c(0.4, 0.7),
     d_window = c(0.7, 1.0),
     stim_levels = NULL,
     overall_color = "red",
     marker_color = "black",
-    base_size = 12
-) {
+    base_size = 12)
+{
 
   # Input validation
   required_cols <- c("time", "value", "stim_nd")
@@ -173,6 +178,49 @@ zeus_plot_mean_waveform <- function(
     df_overall <- NULL
   }
 
+  # Mean photocell trace
+  df_photocell <- NULL
+  photocell_scale_factor <- NA_real_
+
+  if (isTRUE(include_photocell)) {
+    if (!"channel" %in% names(df_long)) {
+      warning("No `channel` column found; photocell trace cannot be added.", call. = FALSE)
+    } else {
+      df_photocell <- df_long |>
+        dplyr::filter(grepl(photocell_filter, .data$channel)) |>
+        dplyr::group_by(.data$time) |>
+        dplyr::summarise(
+          signal = mean(.data$value, na.rm = TRUE),
+          .groups = "drop"
+        )
+
+      if (nrow(df_photocell) == 0) {
+        warning("No photocell rows matched `photocell_filter`.", call. = FALSE)
+        df_photocell <- NULL
+      } else {
+        if (isTRUE(photocell_auto_scale)) {
+          erg_peak <- max(abs(df_by_stim$signal), na.rm = TRUE)
+          photocell_peak <- max(abs(df_photocell$signal), na.rm = TRUE)
+
+          if (is.finite(erg_peak) &&
+              is.finite(photocell_peak) &&
+              photocell_peak > 0) {
+            photocell_scale_factor <- (erg_peak * photocell_relative_height) / photocell_peak
+          } else {
+            photocell_scale_factor <- 1
+          }
+        } else {
+          photocell_scale_factor <- 1
+        }
+
+        df_photocell <- df_photocell |>
+          dplyr::mutate(
+            signal = .data$signal * photocell_scale_factor
+          )
+      }
+    }
+  }
+
   # Build plot
   p <- ggplot2::ggplot()
 
@@ -244,122 +292,234 @@ zeus_plot_mean_waveform <- function(
       )
   }
 
+  # Add photocell
+  if (!is.null(df_photocell)) {
+    p <- p +
+      ggplot2::geom_line(
+        data = df_photocell,
+        ggplot2::aes(
+          x = .data$time * 1000,
+          y = .data$signal
+        ),
+        color = photocell_color,
+        linewidth = 0.5,
+        alpha = 0.95,
+        inherit.aes = FALSE,
+        show.legend = FALSE,
+        lineend = "round"
+      )
+  }
+
   # Marker overlay
   if (isTRUE(overlay_markers) && isTRUE(include_overall)) {
     overall_for_markers <- df_overall |>
       dplyr::filter(.data$signal_type == "Smoothed") |>
-      dplyr::select(.data$time, .data$signal)
+      dplyr::select(.data$time, .data$signal) |>
+      dplyr::arrange(.data$time)
 
-    get_marker <- function(data, window, type, extreme_fn) {
-      data |>
-        dplyr::filter(.data$time >= window[1], .data$time <= window[2]) |>
-        extreme_fn(order_by = .data$signal, n = 1, with_ties = FALSE) |>
-        dplyr::transmute(
-          marker_type = type,
-          time_ms = .data$time * 1000
-        )
-    }
+    if (nrow(overall_for_markers) > 0) {
 
-    marker_lines <- dplyr::bind_rows(
-      get_marker(overall_for_markers, a_window, "A-wave trough", dplyr::slice_min),
-      get_marker(overall_for_markers, b_window, "B-wave peak", dplyr::slice_max),
-      get_marker(overall_for_markers, d_window, "D-wave peak", dplyr::slice_max)
-    ) |>
-      dplyr::mutate(
-        marker_type = factor(
-          .data$marker_type,
-          levels = c("A-wave trough", "B-wave peak", "D-wave peak")
+      # A-wave trough
+      a_marker <- overall_for_markers |>
+        dplyr::filter(.data$time >= a_window[1], .data$time <= a_window[2])
+
+      if (nrow(a_marker) > 0) {
+        a_marker <- a_marker |>
+          dplyr::slice_min(order_by = .data$signal, n = 1, with_ties = FALSE) |>
+          dplyr::transmute(
+            marker_type = "A-wave trough",
+            time_ms = .data$time * 1000
+          )
+      } else {
+        a_marker <- dplyr::tibble(
+          marker_type = "A-wave trough",
+          time_ms = NA_real_
         )
+      }
+
+      # B-wave peak after A-wave trough
+      b_marker <- dplyr::tibble(
+        marker_type = "B-wave peak",
+        time_ms = NA_real_
       )
 
-    p <- p +
-      ggplot2::geom_vline(
-        data = marker_lines,
-        ggplot2::aes(
-          xintercept = .data$time_ms,
-          linetype = .data$marker_type
-        ),
-        color = marker_color,
-        linewidth = 0.8,
-        alpha = 0.95,
-        inherit.aes = FALSE
-      ) +
-      ggplot2::scale_linetype_manual(
-        name = "Reference lines",
-        values = c(
-          "A-wave trough" = "dotted",
-          "B-wave peak" = "longdash",
-          "D-wave peak" = "dotdash"
+      if (!is.na(a_marker$time_ms[1])) {
+        a_time <- a_marker$time_ms[1] / 1000
+
+        b_candidates <- overall_for_markers |>
+          dplyr::filter(
+            .data$time >= max(b_window[1], a_time),
+            .data$time <= b_window[2]
+          )
+
+        if (nrow(b_candidates) > 0) {
+          b_marker <- b_candidates |>
+            dplyr::slice_max(order_by = .data$signal, n = 1, with_ties = FALSE) |>
+            dplyr::transmute(
+              marker_type = "B-wave peak",
+              time_ms = .data$time * 1000
+            )
+        }
+      }
+
+      # Fallback for B-wave if post-A search fails
+      if (is.na(b_marker$time_ms[1])) {
+        b_candidates <- overall_for_markers |>
+          dplyr::filter(.data$time >= b_window[1], .data$time <= b_window[2])
+
+        if (nrow(b_candidates) > 0) {
+          b_marker <- b_candidates |>
+            dplyr::slice_max(order_by = .data$signal, n = 1, with_ties = FALSE) |>
+            dplyr::transmute(
+              marker_type = "B-wave peak",
+              time_ms = .data$time * 1000
+            )
+        }
+      }
+
+      # D-wave trough first, then D-wave peak after trough
+      d_marker <- dplyr::tibble(
+        marker_type = "D-wave peak",
+        time_ms = NA_real_
+      )
+
+      d_candidates <- overall_for_markers |>
+        dplyr::filter(.data$time >= d_window[1], .data$time <= d_window[2])
+
+      if (nrow(d_candidates) > 0) {
+        d_window_width <- diff(d_window)
+        d_trough_end <- d_window[1] + (d_window_width * 0.4)
+
+        d_trough_candidates <- d_candidates |>
+          dplyr::filter(.data$time <= d_trough_end)
+
+        if (nrow(d_trough_candidates) > 0) {
+          d_trough <- d_trough_candidates |>
+            dplyr::slice_min(order_by = .data$signal, n = 1, with_ties = FALSE)
+
+          d_peak_candidates <- d_candidates |>
+            dplyr::filter(.data$time > d_trough$time)
+
+          if (nrow(d_peak_candidates) > 0) {
+            d_marker <- d_peak_candidates |>
+              dplyr::slice_max(order_by = .data$signal, n = 1, with_ties = FALSE) |>
+              dplyr::transmute(
+                marker_type = "D-wave peak",
+                time_ms = .data$time * 1000
+              )
+          }
+        }
+
+        # Fallback for D-wave if trough→peak search fails
+        if (is.na(d_marker$time_ms[1])) {
+          d_marker <- d_candidates |>
+            dplyr::slice_max(order_by = .data$signal, n = 1, with_ties = FALSE) |>
+            dplyr::transmute(
+              marker_type = "D-wave peak",
+              time_ms = .data$time * 1000
+            )
+        }
+      }
+
+      marker_lines <- dplyr::bind_rows(a_marker, b_marker, d_marker) |>
+        dplyr::filter(!is.na(.data$time_ms)) |>
+        dplyr::mutate(
+          marker_type = factor(
+            .data$marker_type,
+            levels = c("A-wave trough", "B-wave peak", "D-wave peak")
+          )
         )
+
+      if (nrow(marker_lines) > 0) {
+        p <- p +
+          ggplot2::geom_vline(
+            data = marker_lines,
+            ggplot2::aes(
+              xintercept = .data$time_ms,
+              linetype = .data$marker_type
+            ),
+            color = marker_color,
+            linewidth = 0.8,
+            alpha = 0.95,
+            inherit.aes = FALSE
+          ) +
+          ggplot2::scale_linetype_manual(
+            name = "Reference lines",
+            values = c(
+              "A-wave trough" = "dotted",
+              "B-wave peak" = "longdash",
+              "D-wave peak" = "dotdash"
+            )
+          )
+      }
+    }
+  }
+    # Final formatting
+    color_values <- c(nd_colors, "Overall Mean" = overall_color)
+    color_breaks <- c(stim_levels_chr, if (isTRUE(include_overall)) "Overall Mean")
+
+    p +
+      ggplot2::scale_color_manual(
+        values = color_values,
+        breaks = color_breaks,
+        drop = FALSE
+      ) +
+      ggplot2::guides(
+        color = ggplot2::guide_legend(
+          title = "Stimulus ND",
+          order = 1,
+          override.aes = list(
+            linewidth = c(rep(1.1, length(color_breaks) - 1), 1.6),
+            alpha = 1,
+            linetype = "solid"
+          )
+        ),
+        linetype = ggplot2::guide_legend(
+          title = "Reference lines",
+          order = 2,
+          override.aes = list(
+            color = marker_color,
+            linewidth = 0.9,
+            alpha = 1
+          )
+        ),
+        alpha = ggplot2::guide_legend(
+          title = "Signal",
+          order = 3
+        )
+      ) +
+      ggplot2::scale_x_continuous(
+        breaks = scales::pretty_breaks(n = 6),
+        expand = ggplot2::expansion(mult = c(0.01, 0.03))
+      ) +
+      ggplot2::scale_y_continuous(
+        breaks = scales::pretty_breaks(n = 6),
+        expand = ggplot2::expansion(mult = c(0.03, 0.08))
+      ) +
+      ggplot2::labs(
+        title = "Mean ERG Waveform by Stimulus Level",
+        x = "Time (ms)",
+        y = expression("Response (" * mu * "V)")
+      ) +
+      ggplot2::theme_classic(base_size = base_size) +
+      ggplot2::theme(
+        plot.title = ggplot2::element_text(
+          face = "bold",
+          hjust = 0.5,
+          margin = ggplot2::margin(b = 10)
+        ),
+        axis.title = ggplot2::element_text(face = "bold"),
+        axis.text = ggplot2::element_text(color = "black"),
+        legend.title = ggplot2::element_text(face = "bold"),
+        legend.position = "right",
+        legend.box = "vertical",
+        legend.spacing.y = grid::unit(0.25, "cm"),
+        legend.key.width = grid::unit(0.9, "cm"),
+        panel.border = ggplot2::element_blank(),
+        axis.line = ggplot2::element_line(linewidth = 0.6),
+        axis.ticks = ggplot2::element_line(linewidth = 0.5)
       )
   }
-
-  # Final formating
-  color_values <- c(nd_colors, "Overall Mean" = overall_color)
-  color_breaks <- c(stim_levels_chr, if (isTRUE(include_overall)) "Overall Mean")
-
-  p +
-    ggplot2::scale_color_manual(
-      values = color_values,
-      breaks = color_breaks,
-      drop = FALSE
-    ) +
-    ggplot2::guides(
-      color = ggplot2::guide_legend(
-        title = "Stimulus ND",
-        order = 1,
-        override.aes = list(
-          linewidth = c(rep(1.1, length(color_breaks) - 1), 1.6),
-          alpha = 1,
-          linetype = "solid"
-        )
-      ),
-      linetype = ggplot2::guide_legend(
-        title = "Reference lines",
-        order = 2,
-        override.aes = list(
-          color = marker_color,
-          linewidth = 0.9,
-          alpha = 1
-        )
-      ),
-      alpha = ggplot2::guide_legend(
-        title = "Signal",
-        order = 3
-      )
-    ) +
-    ggplot2::scale_x_continuous(
-      breaks = scales::pretty_breaks(n = 6),
-      expand = ggplot2::expansion(mult = c(0.01, 0.03))
-    ) +
-    ggplot2::scale_y_continuous(
-      breaks = scales::pretty_breaks(n = 6),
-      expand = ggplot2::expansion(mult = c(0.03, 0.08))
-    ) +
-    ggplot2::labs(
-      title = "Mean ERG Waveform by Stimulus Level",
-      x = "Time (ms)",
-      y = expression("Response (" * mu * "V)")
-    ) +
-    ggplot2::theme_classic(base_size = base_size) +
-    ggplot2::theme(
-      plot.title = ggplot2::element_text(
-        face = "bold",
-        hjust = 0.5,
-        margin = ggplot2::margin(b = 10)
-      ),
-      axis.title = ggplot2::element_text(face = "bold"),
-      axis.text = ggplot2::element_text(color = "black"),
-      legend.title = ggplot2::element_text(face = "bold"),
-      legend.position = "right",
-      legend.box = "vertical",
-      legend.spacing.y = grid::unit(0.25, "cm"),
-      legend.key.width = grid::unit(0.9, "cm"),
-      panel.border = ggplot2::element_blank(),
-      axis.line = ggplot2::element_line(linewidth = 0.6),
-      axis.ticks = ggplot2::element_line(linewidth = 0.5)
-    )
-}
 
 
 # Intensity Response by ND -----------------------------------------------------
