@@ -3,14 +3,14 @@
 
 
 #'  ZEUS Protocol Object
-#'  
+#'
 #'  @param id Character scalar protocol id.
 #'  @param desciption Scalar description.
 #'  @param builder Function returning a protocol table.
-#'  
+#'
 #'  @return An object of class "zeus_protocol"
 #'  @keywords internal
-zeus_protocol <- function(is, description, builder) {
+zeus_protocol <- function(id, description, builder) {
   if (!is.character(id) || length(id) != 1L || !nzchar(id)) {
     stop("'id' must be a single non-empty character string.", call. = FALSE )
   }
@@ -20,7 +20,7 @@ zeus_protocol <- function(is, description, builder) {
   if (!is.function(builder)) {
     stop("'builder' must be a function.", call. = FALSE)
   }
-  
+
   structure(
     list(
       id = id,
@@ -39,9 +39,9 @@ zeus_protocol <- function(is, description, builder) {
 
 
 #' Register a ZEUS protocol
-#' 
+#'
 #' @param protocol A "zeus_protocol" object.
-#' 
+#'
 #' @return Invisily returns the protocol.
 #' @keywords internal
 register_zeus_protocol <- function(protocol) {
@@ -57,10 +57,10 @@ register_zeus_protocol <- function(protocol) {
 
 
 #' Get a resisted ZEUS protocol
-#' 
+#'
 #' @param id Character scalar protocol id.
-#' 
-#' @return A "zeus_protocol" object. 
+#'
+#' @return A "zeus_protocol" object.
 #' @export
 get_zeus_protocol <- function(id){
   if (!exists(id, envir = .zeus_protocol_registry, inherits = FALSE)) {
@@ -69,7 +69,7 @@ get_zeus_protocol <- function(id){
       call. = FALSE
     )
   }
-  
+
   get(id, envir = .zeus_protocol_registry, inherits = FALSE)
 }
 
@@ -77,7 +77,7 @@ get_zeus_protocol <- function(id){
 # List Protocols ----------------------------------------------------------
 
 #' List registered ZEUS protocols
-#' 
+#'
 #' @return Character vector of registered protocol ids.
 #' @export
 list_zeus_protocols <- function() {
@@ -87,7 +87,7 @@ list_zeus_protocols <- function() {
 
 # C0 - Protocol -----------------------------------------------------------
 
-#' Build the ZEUS C0 spectral protocol table 
+#' Build the ZEUS C0 spectral protocol table
 #'
 #' 10 wavelength blocks x 7 ND levels = 70 stimulus conditions.
 #'
@@ -100,7 +100,7 @@ protocol_table_C0 <- function() {
       stim_nd = stim_nd
     )
   }
-  
+
   dplyr::bind_rows(
     make_block(650, c(4.0, 3.5, 3.0, 2.5, 2.0, 1.5, 1.0)),
     make_block(570, c(5.0, 4.5, 4.0, 3.5, 3.0, 2.5, 2.0)),
@@ -136,7 +136,7 @@ protocol_table_C0 <- function() {
 #' @export
 protocol_table_C1 <- function() {
   nd_values <- c(6.0, 5.5, 5.0, 4.5, 4.0, 3.5, 3.0)
-  
+
   tibble::tibble(
     protocol_id = "C1",
     protocol_variant = "white",
@@ -163,13 +163,13 @@ expand_protocol_repeats <- function(protocol_tbl, repeats_per_stim = 4L) {
   if (!is.data.frame(protocol_tbl)) {
     stop("'protocol_tbl' must be a data frame.", call. = FALSE)
   }
-  
+
   repeats_per_stim <- as.integer(repeats_per_stim)
-  
+
   if (repeats_per_stim < 1L) {
     stop("'repeats_per_stim' must be >= 1.", call. = FALSE)
   }
-  
+
   protocol_tbl |>
     tidyr::uncount(weights = repeats_per_stim, .id = "tech_rep") |>
     dplyr::mutate(
