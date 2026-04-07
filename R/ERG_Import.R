@@ -90,17 +90,17 @@ read_abf_raw <- function(path, ...) {
 #'
 #' @export
 zeus_read_abf <- function(x,
-                     protocol = c("raw", "C0", "C1"),
-                     erg_channel = "ERG DAM80",
-                     pc_channel = "Photocell",
-                     repeats_per_stim = 4L,
-                     expected_stim = 70L,
-                     exclude_noisy = FALSE,
-                     noise_threshold = 1.5,
-                     zero_baseline = TRUE,
-                     baseline_window_ms = c(300, 400),
-                     smooth_n = 1L,
-                     ...) {
+                          protocol = c("raw", "C0", "C1"),
+                          erg_channel = "ERG DAM80",
+                          pc_channel = "Photocell",
+                          repeats_per_stim = 4L,
+                          expected_stim = 70L,
+                          exclude_noisy = FALSE,
+                          noise_threshold = 1.5,
+                          zero_baseline = TRUE,
+                          baseline_window_ms = c(300, 400),
+                          smooth_n = 1L,
+                          ...) {
   protocol <- match.arg(protocol)
 
   repeats_per_stim <- as.integer(repeats_per_stim)
@@ -135,7 +135,7 @@ zeus_read_abf <- function(x,
     stop("'smooth_n' must be >= 1.", call. = FALSE)
   }
 
-  raw_abf <- if (inherits(x, "zeus_abf_raw")) {
+  raw_obj <- if (inherits(x, "zeus_abf_raw")) {
     x
   } else if (is.character(x) && length(x) == 1L) {
     read_abf_raw(x, ...)
@@ -144,11 +144,11 @@ zeus_read_abf <- function(x,
   }
 
   if (identical(protocol, "raw")) {
-    return(raw_abf)
+    return(raw_obj)
   }
 
   build_stimresp(
-    x = raw_abf,
+    x = raw_obj,
     protocol = protocol,
     erg_channel = erg_channel,
     pc_channel = pc_channel,
@@ -166,13 +166,19 @@ zeus_read_abf <- function(x,
 
 #' Convert readABF output to a standardized long data frame
 #'
-#' @param raw_abf An object of class `ABF`.
+#' @param raw_abf An object of class `.abf`.
 #'
 #' @return A tibble in long format with columns:
 #'   `sweep`, `time`, `channel`, `units`, and `value`.
 #' @keywords internal
 abf_as_df_long <- function(raw_abf) {
-  stopifnot(inherits(raw_abf, "ABF"))
+  if (inherits(raw_abf, "zeus_abf_raw")) {
+    raw_abf <- raw_abf$raw
+  }
+
+  if (!inherits(raw_abf, "ABF")) {
+    stop("`raw_abf` must be an ABF object or a `zeus_abf_raw` object.", call. = FALSE)
+  }
 
   if (!requireNamespace("purrr", quietly = TRUE)) {
     stop("Package 'purrr' is required.", call. = FALSE)
@@ -198,7 +204,6 @@ abf_as_df_long <- function(raw_abf) {
     )
   })
 }
-
 
 # Convert to wide DF ------------------------------------------------------
 

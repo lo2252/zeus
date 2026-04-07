@@ -14,7 +14,7 @@ compute_noisy_trace_flags <- function(erg_labeled,
                                       noise_threshold = 1.5) {
   needed <- c("sweep", "time", "value", "stim_index")
   missing_cols <- setdiff(needed, names(erg_labeled))
-  
+
   if (length(missing_cols) > 0L) {
     stop(
       "Missing required columns: ",
@@ -22,7 +22,7 @@ compute_noisy_trace_flags <- function(erg_labeled,
       call. = FALSE
     )
   }
-  
+
   erg_labeled |>
     dplyr::mutate(time_ms = zeus_time_to_ms(.data$time)) |>
     dplyr::filter(
@@ -81,7 +81,7 @@ zero_baseline_traces <- function(erg_df, baseline_window_ms = c(300, 400)) {
 #' @export
 smooth_stimresp_traces <- function(erg_df, n = 1L) {
   n <- as.integer(n)
-  
+
   erg_df |>
     dplyr::group_by(.data$sweep) |>
     dplyr::arrange(.data$time, .by_group = TRUE) |>
@@ -186,17 +186,22 @@ build_stimresp <- function(x,
                            baseline_window_ms = c(300, 400),
                            smooth_n = 1L) {
   protocol <- match.arg(protocol)
-  
-  raw_abf <- if (inherits(x, "zeus_abf_raw")) x else read_abf_raw(x)
-  df_long <- abf_as_df_long(raw_abf)
+
+  raw_obj <- if (inherits(x, "zeus_abf_raw")) {
+    x
+  } else {
+    read_abf_raw(x)
+  }
+
+  df_long <- abf_as_df_long(raw_obj$raw)
   validate_long_abf_df(df_long)
-  
+
   erg_df <- extract_channel_trace_df(df_long, erg_channel)
-  pc_df <- extract_channel_trace_df(df_long, pc_channel)
-  
+  pc_df  <- extract_channel_trace_df(df_long, pc_channel)
+
   sweep_ids <- sort(unique(erg_df$sweep))
   expected_sweeps <- as.integer(expected_stim) * as.integer(repeats_per_stim)
-  
+
   if (length(sweep_ids) < expected_sweeps) {
     stop(
       "Expected at least ", expected_sweeps,
@@ -204,7 +209,7 @@ build_stimresp <- function(x,
       call. = FALSE
     )
   }
-  
+
   if (length(sweep_ids) > expected_sweeps) {
     warning(
       "Found ", length(sweep_ids), " ERG sweeps; using first ",
@@ -214,13 +219,13 @@ build_stimresp <- function(x,
     erg_df <- erg_df |>
       dplyr::filter(.data$sweep %in% sweep_ids)
   }
-  
+
   protocol_tbl <- switch(
     protocol,
     C0 = protocol_table_C0(),
     C1 = protocol_table_C1()
   )
-  
+
   protocol_sweeps <- expand_protocol_repeats(
     protocol_tbl = protocol_tbl,
     repeats_per_stim = repeats_per_stim
@@ -229,25 +234,25 @@ build_stimresp <- function(x,
       sweep = sweep_ids,
       .before = 1
     )
-  
+
   erg_labeled <- erg_df |>
     dplyr::left_join(protocol_sweeps, by = "sweep")
-  
+
   if (any(is.na(erg_labeled$stim_index))) {
     stop("Protocol join failed for one or more sweeps.", call. = FALSE)
   }
-  
+
   if (zero_baseline) {
     erg_labeled <- zero_baseline_traces(
       erg_labeled,
       baseline_window_ms = baseline_window_ms
     )
   }
-  
+
   if (smooth_n > 1L) {
     erg_labeled <- smooth_stimresp_traces(erg_labeled, n = smooth_n)
   }
-  
+
   noisy_flags <- NULL
   if (isTRUE(exclude_noisy)) {
     noisy_flags <- compute_noisy_trace_flags(
@@ -255,7 +260,7 @@ build_stimresp <- function(x,
       response_window_ms = c(300, 1000),
       noise_threshold = noise_threshold
     )
-    
+
     erg_labeled <- erg_labeled |>
       dplyr::left_join(
         noisy_flags |>
@@ -264,21 +269,21 @@ build_stimresp <- function(x,
       ) |>
       dplyr::filter(is.na(.data$keep) | .data$keep)
   }
-  
+
   stimresp_70 <- average_technical_replicates(erg_labeled)
-  
+
   photocell <- pc_df |>
     dplyr::filter(.data$sweep == min(.data$sweep, na.rm = TRUE)) |>
     dplyr::mutate(time_ms = zeus_time_to_ms(.data$time))
-  
+
   white_ir_means <- NULL
   if (identical(protocol, "C1")) {
     white_ir_means <- compute_white_ir_means(stimresp_70)
   }
-  
+
   structure(
     list(
-      raw_abf = raw_abf,
+      raw_abf = raw_obj,
       traces_280 = erg_labeled,
       traces_70 = stimresp_70,
       protocol_70 = protocol_tbl,
