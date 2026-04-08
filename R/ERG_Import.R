@@ -44,7 +44,7 @@ read_abf_raw <- function(path, ...) {
 #' Read ABF data into ZEUS
 #'
 #' @description
-#' User-facing import for ZEUS ABF files.
+#' User-facing import wrapper for ZEUS ABF files.
 #'
 #' This function can:
 #' \enumerate{
@@ -55,39 +55,28 @@ read_abf_raw <- function(path, ...) {
 #' Currently supported protocols:
 #' \itemize{
 #'   \item `"raw"`: return only the raw imported ABF object
-#'   \item `"C0"`: spectral protocol (p4 ordering)
+#'   \item `"C0"`: spectral protocol
 #'   \item `"C1"`: white-light protocol
 #' }
 #'
 #' @param x File path to a `.abf` file or a `zeus_abf_raw` object.
 #' @param protocol One of `"raw"`, `"C0"`, or `"C1"`.
-#' @param erg_channel ERG channel identifier as it appears in
-#'   `abf_as_df_long()`. Can be a character channel name or numeric id.
-#' @param pc_channel Photocell channel identifier as it appears in
-#'   `abf_as_df_long()`. Can be a character channel name or numeric id.
+#' @param erg_channel ERG channel identifier.
+#' @param pc_channel Photocell channel identifier.
 #' @param repeats_per_stim Integer number of technical replicates per stimulus.
 #' @param expected_stim Integer number of stimulus conditions.
-#' @param exclude_noisy Logical; if `TRUE`, apply noisy-trace filtering before
-#'   averaging.
-#' @param noise_threshold Numeric SD-ratio threshold for noisy trace exclusion.
-#' @param zero_baseline Logical; if `TRUE`, subtract the mean baseline from each
-#'   trace before averaging.
-#' @param baseline_window_ms Numeric length-2 vector giving the baseline window
-#'   in milliseconds.
-#' @param smooth_n Integer running-mean window for optional smoothing.
-#' @param ... Additional arguments passed to `read_abf_raw()` when `x` is a file path.
+#' @param exclude_noisy Logical.
+#' @param noise_threshold Numeric threshold for noisy-trace exclusion.
+#' @param zero_baseline Logical.
+#' @param baseline_window_ms Numeric length-2 vector in milliseconds.
+#' @param smooth_n Integer running-mean window size.
+#' @param align_to_stimulus One of `"protocol"` or `"photocell"`.
+#' @param photocell_baseline_window_ms Numeric length-2 vector used for photocell baseline estimation.
+#' @param photocell_threshold_frac Fraction of photocell rise used for onset detection.
+#' @param ... Additional arguments passed only to `read_abf_raw()` when `x` is a file path.
 #'
-#' @return
-#' If `protocol = "raw"`, returns a `zeus_abf_raw` object.
-#'
-#' If `protocol = "C0"` or `"C1"`, returns a `zeus_stimresp` object.
-#' @section Workflow:
-#' Typical ZEUS workflow:
-#' \preformatted{
-#' stim <- zeus_read_abf("file.abf", protocol = "C0")
-#' amps <- extract_irrad_wl_amp(stim)
-#' }
-#'
+#' @return A `zeus_abf_raw` object if `protocol = "raw"`, otherwise a
+#'   `zeus_stimresp` object.
 #' @export
 zeus_read_abf <- function(x,
                           protocol = c("raw", "C0", "C1"),
@@ -100,8 +89,12 @@ zeus_read_abf <- function(x,
                           zero_baseline = TRUE,
                           baseline_window_ms = c(300, 400),
                           smooth_n = 1L,
+                          align_to_stimulus = c("protocol", "photocell"),
+                          photocell_baseline_window_ms = c(0, 300),
+                          photocell_threshold_frac = 0.5,
                           ...) {
   protocol <- match.arg(protocol)
+  align_to_stimulus <- match.arg(align_to_stimulus)
 
   repeats_per_stim <- as.integer(repeats_per_stim)
   expected_stim <- as.integer(expected_stim)
@@ -135,10 +128,27 @@ zeus_read_abf <- function(x,
     stop("'smooth_n' must be >= 1.", call. = FALSE)
   }
 
+  if (!is.numeric(photocell_baseline_window_ms) || length(photocell_baseline_window_ms) != 2L) {
+    stop(
+      "'photocell_baseline_window_ms' must be a numeric vector of length 2.",
+      call. = FALSE
+    )
+  }
+
+  if (!is.numeric(photocell_threshold_frac) ||
+      length(photocell_threshold_frac) != 1L ||
+      is.na(photocell_threshold_frac) ||
+      photocell_threshold_frac <= 0) {
+    stop(
+      "'photocell_threshold_frac' must be a single positive numeric value.",
+      call. = FALSE
+    )
+  }
+
   raw_obj <- if (inherits(x, "zeus_abf_raw")) {
     x
   } else if (is.character(x) && length(x) == 1L) {
-    read_abf_raw(x, ...)
+    read_abf_raw(path = x, ...)
   } else {
     stop("'x' must be a file path or a 'zeus_abf_raw' object.", call. = FALSE)
   }
@@ -158,7 +168,10 @@ zeus_read_abf <- function(x,
     noise_threshold = noise_threshold,
     zero_baseline = zero_baseline,
     baseline_window_ms = baseline_window_ms,
-    smooth_n = smooth_n
+    smooth_n = smooth_n,
+    align_to_stimulus = align_to_stimulus,
+    photocell_baseline_window_ms = photocell_baseline_window_ms,
+    photocell_threshold_frac = photocell_threshold_frac
   )
 }
 

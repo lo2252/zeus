@@ -115,7 +115,7 @@ protocol_table_C0 <- function() {
   ) |>
     dplyr::mutate(
       protocol_id = "C0",
-      protocol_variant = "p4",
+      protocol_variant = "p4", # Based on origin documentation
       stim_type = "flash",
       stim_index = dplyr::row_number(),
       block_index = rep(seq_len(10L), each = 7L),
