@@ -1,10 +1,19 @@
-#' Plot mean ERG waveform across sweeps with optional reference lines
+# Mean ERG waveform plot across sweeps ------------------------------------
+
+#' Plot mean ERG waveforms from ZEUS StimResp output
 #'
-#' Computes and visualizes the mean waveform across sweeps for each stimulus
-#' level, along with an overall mean waveform across all sweeps.
+#' @description
+#' Visualizes averaged ERG waveforms from ZEUS StimResp output.
+#'
+#' This function works with either:
+#' \itemize{
+#'   \item a `zeus_stimresp` object returned by `build_stimresp()` or
+#'     `zeus_read_abf()`, or
+#'   \item a long-format data frame containing waveform data.
+#' }
 #'
 #' Stimulus-specific mean waveforms are drawn as thinner color-coded lines,
-#' while the overall mean waveform is drawn as a thicker red line by default.
+#' while the overall mean waveform is drawn as a thicker line.
 #' Time is displayed in milliseconds.
 #'
 #' If marker overlay is requested, the function computes reference lines from
@@ -16,32 +25,45 @@
 #'   \item D-wave peak
 #' }
 #'
-#' @param df_long ZEUS long-format data frame.
-#' @param channel_filter Optional channel to filter (for example, `"ERG DAM80"`).
+#' @param x A `zeus_stimresp` object or a long-format waveform data frame.
+#' @param data_slot For `zeus_stimresp` objects, which component to plot.
+#'   Default is `"traces_70"`. Can also be `"traces_280"`.
+#' @param channel_filter Optional channel to filter. Ignored if the selected
+#'   data slot does not contain a `channel` column.
 #' @param compare_raw Logical; if `TRUE`, plots both raw and smoothed means.
-#'   Requires `value_raw` in `df_long`. Default is `FALSE`.
+#'   Requires `value_raw` in the plotted data. Default is `FALSE`.
 #' @param include_overall Logical; if `TRUE`, includes an overall mean waveform
-#'   across all sweeps.
+#'   across all plotted traces.
 #' @param overlay_markers Logical; if `TRUE`, overlays vertical reference lines
 #'   at the A-wave trough, B-wave peak, and D-wave peak locations derived from
 #'   the overall mean waveform.
+#' @param include_photocell Logical; if `TRUE`, adds the mean photocell trace
+#'   when available.
+#' @param photocell_filter Character string used to identify the photocell
+#'   channel when plotting from a data frame or from `traces_280`.
+#' @param photocell_color Color for the photocell trace.
+#' @param photocell_auto_scale Logical; if `TRUE`, rescales the photocell trace
+#'   relative to the ERG signal.
+#' @param photocell_relative_height Relative height multiplier used when
+#'   `photocell_auto_scale = TRUE`.
 #' @param a_window Numeric length-2 vector giving the A-wave search interval in
-#'   the same units as `df_long$time`.
+#'   milliseconds.
 #' @param b_window Numeric length-2 vector giving the B-wave search interval in
-#'   the same units as `df_long$time`.
+#'   milliseconds.
 #' @param d_window Numeric length-2 vector giving the D-wave search interval in
-#'   the same units as `df_long$time`.
-#' @param stim_levels Optional vector giving the desired order of `stim_nd`
-#'   values in the legend. If `NULL`, numeric values are ordered ascending.
-#' @param overall_color Color for the overall mean line. Default is `"red"`.
-#' @param marker_color Color for the marker reference lines. Default is
-#'   `"black"`.
-#' @param base_size Base font size for the plot theme. Default is `12`.
+#'   milliseconds.
+#' @param stim_levels Optional vector giving the desired order of stimulus labels
+#'   in the legend. If `NULL`, uses the order present in the data.
+#' @param color_by One of `"stim_label"`, `"stim_nd"`, or `"wavelength"`.
+#' @param overall_color Color for the overall mean line.
+#' @param marker_color Color for marker reference lines.
+#' @param base_size Base font size for the plot theme.
 #'
 #' @return A ggplot object.
 #' @export
 zeus_plot_mean_waveform <- function(
-    df_long,
+    x,
+    data_slot = c("traces_70", "traces_280"),
     channel_filter = NULL,
     compare_raw = FALSE,
     include_overall = TRUE,
@@ -51,86 +73,139 @@ zeus_plot_mean_waveform <- function(
     photocell_color = "black",
     photocell_auto_scale = TRUE,
     photocell_relative_height = 1.0,
-    a_window = c(0.4, 0.7),
-    b_window = c(0.4, 0.7),
-    d_window = c(0.7, 1.0),
+    a_window = c(400, 700),
+    b_window = c(400, 700),
+    d_window = c(700, 1000),
     stim_levels = NULL,
+    color_by = c("stim_label", "stim_nd", "wavelength"),
     overall_color = "red",
     marker_color = "black",
-    base_size = 12)
-{
+    base_size = 12
+) {
+  data_slot <- match.arg(data_slot)
+  color_by <- match.arg(color_by)
 
-  # Input validation
-  required_cols <- c("time", "value", "stim_nd")
-  missing_cols <- setdiff(required_cols, names(df_long))
+  # Resolve input
+  if (inherits(x, "zeus_stimresp")) {
+    if (!data_slot %in% names(x)) {
+      stop("`data_slot` not found in `x`.", call. = FALSE)
+    }
+    df_plot <- x[[data_slot]]
+
+    df_photocell_source <- NULL
+    if (!is.null(x$photocell)) {
+      df_photocell_source <- x$photocell
+    } else if ("traces_280" %in% names(x)) {
+      df_photocell_source <- x$traces_280
+    }
+  } else if (is.data.frame(x)) {
+    df_plot <- x
+    df_photocell_source <- x
+  } else {
+    stop("`x` must be a `zeus_stimresp` object or a data frame.", call. = FALSE)
+  }
+
+  required_cols <- c("time", "value")
+  missing_cols <- setdiff(required_cols, names(df_plot))
 
   if (length(missing_cols) > 0) {
     stop(
-      "df_long is missing required columns: ",
+      "Plot data is missing required columns: ",
       paste(missing_cols, collapse = ", "),
       call. = FALSE
     )
   }
 
-  df_plot <- df_long
-
-  if (!is.null(channel_filter)) {
-    if (!"channel" %in% names(df_plot)) {
+  if (!("stim_label" %in% names(df_plot))) {
+    if ("stim_nd" %in% names(df_plot)) {
+      df_plot <- df_plot |>
+        dplyr::mutate(stim_label = as.character(.data$stim_nd))
+    } else {
       stop(
-        "`channel_filter` provided but no `channel` column found.",
+        "Plot data must contain either `stim_label` or `stim_nd`.",
         call. = FALSE
       )
     }
+  }
 
+  if (!("stim_nd" %in% names(df_plot))) {
+    df_plot <- df_plot |>
+      dplyr::mutate(stim_nd = NA_real_)
+  }
+
+  if (!("wavelength" %in% names(df_plot))) {
+    df_plot <- df_plot |>
+      dplyr::mutate(wavelength = NA_character_)
+  }
+
+  if (!("stim_index" %in% names(df_plot))) {
+    df_plot <- df_plot |>
+      dplyr::group_by(.data$stim_label) |>
+      dplyr::mutate(stim_index = dplyr::cur_group_id()) |>
+      dplyr::ungroup()
+  }
+
+  if (!("time_ms" %in% names(df_plot))) {
+    df_plot <- df_plot |>
+      dplyr::mutate(time_ms = zeus_time_to_ms(.data$time))
+  }
+
+  if (!is.null(channel_filter) && "channel" %in% names(df_plot)) {
     df_plot <- df_plot |>
       dplyr::filter(.data$channel == channel_filter)
 
     if (nrow(df_plot) == 0) {
-      stop(
-        "No data left after applying `channel_filter`.",
-        call. = FALSE
-      )
+      stop("No data left after applying `channel_filter`.", call. = FALSE)
     }
   }
 
   if (isTRUE(compare_raw) && !"value_raw" %in% names(df_plot)) {
     stop(
-      "`compare_raw = TRUE` requires a `value_raw` column in `df_long`.",
+      "`compare_raw = TRUE` requires a `value_raw` column in the plotted data.",
       call. = FALSE
     )
   }
 
-  # Stimulus ordering
-  if (is.null(stim_levels)) {
-    stim_unique <- unique(df_plot$stim_nd)
+  # Legend grouping
+  df_plot <- df_plot |>
+    dplyr::mutate(
+      color_group = dplyr::case_when(
+        color_by == "stim_label" ~ as.character(.data$stim_label),
+        color_by == "stim_nd" ~ as.character(.data$stim_nd),
+        color_by == "wavelength" ~ as.character(.data$wavelength),
+        TRUE ~ as.character(.data$stim_label)
+      )
+    )
 
-    if (is.numeric(stim_unique)) {
-      stim_levels <- sort(stim_unique, decreasing = FALSE)
-    } else {
-      stim_levels <- sort(as.character(stim_unique), decreasing = FALSE)
-    }
+  if (is.null(stim_levels)) {
+    stim_levels_chr <- unique(df_plot$color_group)
+  } else {
+    stim_levels_chr <- as.character(stim_levels)
   }
 
-  stim_levels_chr <- as.character(stim_levels)
+  df_plot <- df_plot |>
+    dplyr::mutate(
+      color_group = factor(.data$color_group, levels = stim_levels_chr)
+    )
 
   # Color palette
-  nd_palette <- c(
+  base_palette <- c(
     "#332288", "#88CCEE", "#44AA99", "#117733",
     "#999933", "#DDCC77", "#CC6677", "#882255", "#AA4499"
   )
-  nd_colors <- rep(nd_palette, length.out = length(stim_levels_chr))
-  names(nd_colors) <- stim_levels_chr
+  plot_colors <- rep(base_palette, length.out = length(stim_levels_chr))
+  names(plot_colors) <- stim_levels_chr
 
-  # Aggregate data
+  # Aggregate plotted data
+  group_cols <- c("time_ms", "color_group")
+  optional_cols <- intersect(c("stim_label", "stim_nd", "wavelength"), names(df_plot))
+
   df_by_stim <- df_plot |>
-    dplyr::group_by(.data$time, .data$stim_nd) |>
+    dplyr::group_by(dplyr::across(dplyr::all_of(c(group_cols, optional_cols)))) |>
     dplyr::summarise(
       Smoothed = mean(.data$value, na.rm = TRUE),
       Raw = if (isTRUE(compare_raw)) mean(.data$value_raw, na.rm = TRUE) else NA_real_,
       .groups = "drop"
-    ) |>
-    dplyr::mutate(
-      stim_nd = factor(as.character(.data$stim_nd), levels = stim_levels_chr)
     )
 
   if (isTRUE(compare_raw)) {
@@ -147,9 +222,12 @@ zeus_plot_mean_waveform <- function(
       dplyr::select(-.data$Raw)
   }
 
+  # Overall mean
+  df_overall <- NULL
+
   if (isTRUE(include_overall)) {
     df_overall <- df_plot |>
-      dplyr::group_by(.data$time) |>
+      dplyr::group_by(.data$time_ms) |>
       dplyr::summarise(
         Smoothed = mean(.data$value, na.rm = TRUE),
         Raw = if (isTRUE(compare_raw)) mean(.data$value_raw, na.rm = TRUE) else NA_real_,
@@ -172,51 +250,50 @@ zeus_plot_mean_waveform <- function(
 
     df_overall <- df_overall |>
       dplyr::mutate(
-        stim_nd = factor("Overall Mean", levels = c(stim_levels_chr, "Overall Mean"))
+        color_group = factor("Overall Mean", levels = c(stim_levels_chr, "Overall Mean"))
       )
-  } else {
-    df_overall <- NULL
   }
 
-  # Mean photocell trace
+  # Photocell
   df_photocell <- NULL
-  photocell_scale_factor <- NA_real_
 
-  if (isTRUE(include_photocell)) {
-    if (!"channel" %in% names(df_long)) {
-      warning("No `channel` column found; photocell trace cannot be added.", call. = FALSE)
-    } else {
-      df_photocell <- df_long |>
-        dplyr::filter(grepl(photocell_filter, .data$channel)) |>
-        dplyr::group_by(.data$time) |>
-        dplyr::summarise(
-          signal = mean(.data$value, na.rm = TRUE),
-          .groups = "drop"
-        )
+  if (isTRUE(include_photocell) && !is.null(df_photocell_source)) {
+    if (all(c("time", "value") %in% names(df_photocell_source))) {
+      if (!("time_ms" %in% names(df_photocell_source))) {
+        df_photocell_source <- df_photocell_source |>
+          dplyr::mutate(time_ms = zeus_time_to_ms(.data$time))
+      }
 
-      if (nrow(df_photocell) == 0) {
-        warning("No photocell rows matched `photocell_filter`.", call. = FALSE)
-        df_photocell <- NULL
+      if ("channel" %in% names(df_photocell_source)) {
+        df_photocell <- df_photocell_source |>
+          dplyr::filter(grepl(photocell_filter, .data$channel))
       } else {
+        df_photocell <- df_photocell_source
+      }
+
+      if (nrow(df_photocell) > 0) {
+        df_photocell <- df_photocell |>
+          dplyr::group_by(.data$time_ms) |>
+          dplyr::summarise(
+            signal = mean(.data$value, na.rm = TRUE),
+            .groups = "drop"
+          )
+
         if (isTRUE(photocell_auto_scale)) {
           erg_peak <- max(abs(df_by_stim$signal), na.rm = TRUE)
           photocell_peak <- max(abs(df_photocell$signal), na.rm = TRUE)
 
-          if (is.finite(erg_peak) &&
-              is.finite(photocell_peak) &&
-              photocell_peak > 0) {
-            photocell_scale_factor <- (erg_peak * photocell_relative_height) / photocell_peak
+          if (is.finite(erg_peak) && is.finite(photocell_peak) && photocell_peak > 0) {
+            scale_factor <- (erg_peak * photocell_relative_height) / photocell_peak
           } else {
-            photocell_scale_factor <- 1
+            scale_factor <- 1
           }
-        } else {
-          photocell_scale_factor <- 1
-        }
 
-        df_photocell <- df_photocell |>
-          dplyr::mutate(
-            signal = .data$signal * photocell_scale_factor
-          )
+          df_photocell <- df_photocell |>
+            dplyr::mutate(signal = .data$signal * scale_factor)
+        }
+      } else {
+        df_photocell <- NULL
       }
     }
   }
@@ -229,11 +306,11 @@ zeus_plot_mean_waveform <- function(
       ggplot2::geom_line(
         data = df_by_stim,
         ggplot2::aes(
-          x = .data$time * 1000,
+          x = .data$time_ms,
           y = .data$signal,
-          color = .data$stim_nd,
+          color = .data$color_group,
           alpha = .data$signal_type,
-          group = interaction(.data$stim_nd, .data$signal_type)
+          group = interaction(.data$color_group, .data$signal_type)
         ),
         linewidth = 0.55,
         lineend = "round"
@@ -248,10 +325,10 @@ zeus_plot_mean_waveform <- function(
       ggplot2::geom_line(
         data = df_by_stim,
         ggplot2::aes(
-          x = .data$time * 1000,
+          x = .data$time_ms,
           y = .data$signal,
-          color = .data$stim_nd,
-          group = .data$stim_nd
+          color = .data$color_group,
+          group = .data$color_group
         ),
         linewidth = 0.60,
         alpha = 0.95,
@@ -259,15 +336,12 @@ zeus_plot_mean_waveform <- function(
       )
   }
 
-  if (isTRUE(include_overall)) {
+  if (isTRUE(include_overall) && !is.null(df_overall)) {
     if (isTRUE(compare_raw)) {
       p <- p +
         ggplot2::geom_line(
           data = dplyr::filter(df_overall, .data$signal_type == "Raw"),
-          ggplot2::aes(
-            x = .data$time * 1000,
-            y = .data$signal
-          ),
+          ggplot2::aes(x = .data$time_ms, y = .data$signal),
           color = overall_color,
           linewidth = 1.00,
           alpha = 0.30,
@@ -281,9 +355,9 @@ zeus_plot_mean_waveform <- function(
       ggplot2::geom_line(
         data = dplyr::filter(df_overall, .data$signal_type == "Smoothed"),
         ggplot2::aes(
-          x = .data$time * 1000,
+          x = .data$time_ms,
           y = .data$signal,
-          color = .data$stim_nd
+          color = .data$color_group
         ),
         linewidth = 1.35,
         alpha = 1,
@@ -292,15 +366,11 @@ zeus_plot_mean_waveform <- function(
       )
   }
 
-  # Add photocell
   if (!is.null(df_photocell)) {
     p <- p +
       ggplot2::geom_line(
         data = df_photocell,
-        ggplot2::aes(
-          x = .data$time * 1000,
-          y = .data$signal
-        ),
+        ggplot2::aes(x = .data$time_ms, y = .data$signal),
         color = photocell_color,
         linewidth = 0.5,
         alpha = 0.95,
@@ -311,45 +381,34 @@ zeus_plot_mean_waveform <- function(
   }
 
   # Marker overlay
-  if (isTRUE(overlay_markers) && isTRUE(include_overall)) {
+  if (isTRUE(overlay_markers) && isTRUE(include_overall) && !is.null(df_overall)) {
     overall_for_markers <- df_overall |>
       dplyr::filter(.data$signal_type == "Smoothed") |>
-      dplyr::select(.data$time, .data$signal) |>
-      dplyr::arrange(.data$time)
+      dplyr::select(.data$time_ms, .data$signal) |>
+      dplyr::arrange(.data$time_ms)
 
     if (nrow(overall_for_markers) > 0) {
-
-      # A-wave trough
       a_marker <- overall_for_markers |>
-        dplyr::filter(.data$time >= a_window[1], .data$time <= a_window[2])
+        dplyr::filter(.data$time_ms >= a_window[1], .data$time_ms <= a_window[2])
 
       if (nrow(a_marker) > 0) {
         a_marker <- a_marker |>
           dplyr::slice_min(order_by = .data$signal, n = 1, with_ties = FALSE) |>
           dplyr::transmute(
             marker_type = "A-wave trough",
-            time_ms = .data$time * 1000
+            time_ms = .data$time_ms
           )
       } else {
-        a_marker <- dplyr::tibble(
-          marker_type = "A-wave trough",
-          time_ms = NA_real_
-        )
+        a_marker <- tibble::tibble(marker_type = "A-wave trough", time_ms = NA_real_)
       }
 
-      # B-wave peak after A-wave trough
-      b_marker <- dplyr::tibble(
-        marker_type = "B-wave peak",
-        time_ms = NA_real_
-      )
+      b_marker <- tibble::tibble(marker_type = "B-wave peak", time_ms = NA_real_)
 
       if (!is.na(a_marker$time_ms[1])) {
-        a_time <- a_marker$time_ms[1] / 1000
-
         b_candidates <- overall_for_markers |>
           dplyr::filter(
-            .data$time >= max(b_window[1], a_time),
-            .data$time <= b_window[2]
+            .data$time_ms >= max(b_window[1], a_marker$time_ms[1]),
+            .data$time_ms <= b_window[2]
           )
 
         if (nrow(b_candidates) > 0) {
@@ -357,66 +416,60 @@ zeus_plot_mean_waveform <- function(
             dplyr::slice_max(order_by = .data$signal, n = 1, with_ties = FALSE) |>
             dplyr::transmute(
               marker_type = "B-wave peak",
-              time_ms = .data$time * 1000
+              time_ms = .data$time_ms
             )
         }
       }
 
-      # Fallback for B-wave if post-A search fails
       if (is.na(b_marker$time_ms[1])) {
         b_candidates <- overall_for_markers |>
-          dplyr::filter(.data$time >= b_window[1], .data$time <= b_window[2])
+          dplyr::filter(.data$time_ms >= b_window[1], .data$time_ms <= b_window[2])
 
         if (nrow(b_candidates) > 0) {
           b_marker <- b_candidates |>
             dplyr::slice_max(order_by = .data$signal, n = 1, with_ties = FALSE) |>
             dplyr::transmute(
               marker_type = "B-wave peak",
-              time_ms = .data$time * 1000
+              time_ms = .data$time_ms
             )
         }
       }
 
-      # D-wave trough first, then D-wave peak after trough
-      d_marker <- dplyr::tibble(
-        marker_type = "D-wave peak",
-        time_ms = NA_real_
-      )
+      d_marker <- tibble::tibble(marker_type = "D-wave peak", time_ms = NA_real_)
 
       d_candidates <- overall_for_markers |>
-        dplyr::filter(.data$time >= d_window[1], .data$time <= d_window[2])
+        dplyr::filter(.data$time_ms >= d_window[1], .data$time_ms <= d_window[2])
 
       if (nrow(d_candidates) > 0) {
         d_window_width <- diff(d_window)
         d_trough_end <- d_window[1] + (d_window_width * 0.4)
 
         d_trough_candidates <- d_candidates |>
-          dplyr::filter(.data$time <= d_trough_end)
+          dplyr::filter(.data$time_ms <= d_trough_end)
 
         if (nrow(d_trough_candidates) > 0) {
           d_trough <- d_trough_candidates |>
             dplyr::slice_min(order_by = .data$signal, n = 1, with_ties = FALSE)
 
           d_peak_candidates <- d_candidates |>
-            dplyr::filter(.data$time > d_trough$time)
+            dplyr::filter(.data$time_ms > d_trough$time_ms)
 
           if (nrow(d_peak_candidates) > 0) {
             d_marker <- d_peak_candidates |>
               dplyr::slice_max(order_by = .data$signal, n = 1, with_ties = FALSE) |>
               dplyr::transmute(
                 marker_type = "D-wave peak",
-                time_ms = .data$time * 1000
+                time_ms = .data$time_ms
               )
           }
         }
 
-        # Fallback for D-wave if trough→peak search fails
         if (is.na(d_marker$time_ms[1])) {
           d_marker <- d_candidates |>
             dplyr::slice_max(order_by = .data$signal, n = 1, with_ties = FALSE) |>
             dplyr::transmute(
               marker_type = "D-wave peak",
-              time_ms = .data$time * 1000
+              time_ms = .data$time_ms
             )
         }
       }
@@ -454,73 +507,78 @@ zeus_plot_mean_waveform <- function(
       }
     }
   }
-    # Final formatting
-    color_values <- c(nd_colors, "Overall Mean" = overall_color)
-    color_breaks <- c(stim_levels_chr, if (isTRUE(include_overall)) "Overall Mean")
 
-    p +
-      ggplot2::scale_color_manual(
-        values = color_values,
-        breaks = color_breaks,
-        drop = FALSE
-      ) +
-      ggplot2::guides(
-        color = ggplot2::guide_legend(
-          title = "Stimulus ND",
-          order = 1,
-          override.aes = list(
-            linewidth = c(rep(1.1, length(color_breaks) - 1), 1.6),
-            alpha = 1,
-            linetype = "solid"
-          )
+  # Final formatting
+  color_values <- c(plot_colors, "Overall Mean" = overall_color)
+  color_breaks <- c(stim_levels_chr, if (isTRUE(include_overall)) "Overall Mean")
+
+  p +
+    ggplot2::scale_color_manual(
+      values = color_values,
+      breaks = color_breaks,
+      drop = FALSE
+    ) +
+    ggplot2::guides(
+      color = ggplot2::guide_legend(
+        title = switch(
+          color_by,
+          stim_label = "Stimulus",
+          stim_nd = "Stimulus ND",
+          wavelength = "Wavelength"
         ),
-        linetype = ggplot2::guide_legend(
-          title = "Reference lines",
-          order = 2,
-          override.aes = list(
-            color = marker_color,
-            linewidth = 0.9,
-            alpha = 1
-          )
-        ),
-        alpha = ggplot2::guide_legend(
-          title = "Signal",
-          order = 3
+        order = 1,
+        override.aes = list(
+          linewidth = c(rep(1.1, length(color_breaks) - 1), 1.6),
+          alpha = 1,
+          linetype = "solid"
         )
-      ) +
-      ggplot2::scale_x_continuous(
-        breaks = scales::pretty_breaks(n = 6),
-        expand = ggplot2::expansion(mult = c(0.01, 0.03))
-      ) +
-      ggplot2::scale_y_continuous(
-        breaks = scales::pretty_breaks(n = 6),
-        expand = ggplot2::expansion(mult = c(0.03, 0.08))
-      ) +
-      ggplot2::labs(
-        title = "Mean ERG Waveform by Stimulus Level",
-        x = "Time (ms)",
-        y = expression("Response (" * mu * "V)")
-      ) +
-      ggplot2::theme_classic(base_size = base_size) +
-      ggplot2::theme(
-        plot.title = ggplot2::element_text(
-          face = "bold",
-          hjust = 0.5,
-          margin = ggplot2::margin(b = 10)
-        ),
-        axis.title = ggplot2::element_text(face = "bold"),
-        axis.text = ggplot2::element_text(color = "black"),
-        legend.title = ggplot2::element_text(face = "bold"),
-        legend.position = "right",
-        legend.box = "vertical",
-        legend.spacing.y = grid::unit(0.25, "cm"),
-        legend.key.width = grid::unit(0.9, "cm"),
-        panel.border = ggplot2::element_blank(),
-        axis.line = ggplot2::element_line(linewidth = 0.6),
-        axis.ticks = ggplot2::element_line(linewidth = 0.5)
+      ),
+      linetype = ggplot2::guide_legend(
+        title = "Reference lines",
+        order = 2,
+        override.aes = list(
+          color = marker_color,
+          linewidth = 0.9,
+          alpha = 1
+        )
+      ),
+      alpha = ggplot2::guide_legend(
+        title = "Signal",
+        order = 3
       )
-  }
-
+    ) +
+    ggplot2::scale_x_continuous(
+      breaks = scales::pretty_breaks(n = 6),
+      expand = ggplot2::expansion(mult = c(0.01, 0.03))
+    ) +
+    ggplot2::scale_y_continuous(
+      breaks = scales::pretty_breaks(n = 6),
+      expand = ggplot2::expansion(mult = c(0.03, 0.08))
+    ) +
+    ggplot2::labs(
+      title = "Mean ERG Waveform",
+      x = "Time (ms)",
+      y = expression("Response (" * mu * "V)")
+    ) +
+    ggplot2::theme_classic(base_size = base_size) +
+    ggplot2::theme(
+      plot.title = ggplot2::element_text(
+        face = "bold",
+        hjust = 0.5,
+        margin = ggplot2::margin(b = 10)
+      ),
+      axis.title = ggplot2::element_text(face = "bold"),
+      axis.text = ggplot2::element_text(color = "black"),
+      legend.title = ggplot2::element_text(face = "bold"),
+      legend.position = "right",
+      legend.box = "vertical",
+      legend.spacing.y = grid::unit(0.25, "cm"),
+      legend.key.width = grid::unit(0.9, "cm"),
+      panel.border = ggplot2::element_blank(),
+      axis.line = ggplot2::element_line(linewidth = 0.6),
+      axis.ticks = ggplot2::element_line(linewidth = 0.5)
+    )
+}
 
 # Intensity Response by ND -----------------------------------------------------
 
