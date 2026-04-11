@@ -5,27 +5,39 @@
 
 # Irradiance Calibration Table --------------------------------------------
 
-#' Register irradiance calibration table
+#' Register an irradiance calibration table
 #'
-#' @param name Calibration id.
-#' @param calib Data frame with columns `wavelength`, `stim_nd`, `log_hv`.
+#' Stores an irradiance calibration table in the ZEUS calibration registry for
+#' later use when joining log irradiance values to stimulus metadata.
 #'
-#' @return Invisibly returns `calib`.
+#' @param name Calibration identifier.
+#' @param calib Data frame containing columns `wavelength`, `stim_nd`, and
+#'   `log_hv`.
+#'
+#' @return Invisibly returns the validated calibration tibble.
 #' @export
 register_zeus_irrad_calibration <- function(name, calib) {
+  if (!is.character(name) || length(name) != 1L || !nzchar(name)) {
+    stop("`name` must be a single non-empty character string.", call. = FALSE)
+  }
+
   required <- c("wavelength", "stim_nd", "log_hv")
   missing_cols <- setdiff(required, names(calib))
 
   if (length(missing_cols) > 0L) {
     stop(
-      "Calibration table must contain: ",
+      "Calibration table must contain columns: ",
       paste(required, collapse = ", "),
       call. = FALSE
     )
   }
 
   calib <- tibble::as_tibble(calib) |>
-    dplyr::mutate(wavelength = as.character(.data$wavelength))
+    dplyr::mutate(
+      wavelength = as.character(.data$wavelength),
+      stim_nd = as.numeric(.data$stim_nd),
+      log_hv = as.numeric(.data$log_hv)
+    )
 
   assign(name, calib, envir = .zeus_irrad_registry)
   invisible(calib)
@@ -34,13 +46,17 @@ register_zeus_irrad_calibration <- function(name, calib) {
 
 # Registered Irradiance ---------------------------------------------------
 
-#' Get a registered irradiance calibration
+#' Get a registered irradiance calibration table
 #'
-#' @param name Calibration id.
+#' @param name Calibration identifier.
 #'
-#' @return Calibration tibble.
+#' @return A calibration tibble.
 #' @export
 get_zeus_irrad_calibration <- function(name) {
+  if (!is.character(name) || length(name) != 1L || !nzchar(name)) {
+    stop("`name` must be a single non-empty character string.", call. = FALSE)
+  }
+
   if (!exists(name, envir = .zeus_irrad_registry, inherits = FALSE)) {
     stop("Calibration '", name, "' is not registered.", call. = FALSE)
   }
@@ -49,20 +65,24 @@ get_zeus_irrad_calibration <- function(name) {
 }
 
 
-# Joins Irradiance/Stimulus  ----------------------------------------------
+# Join Irradiance to Metadata ---------------------------------------------
 
 #' Join log irradiance values to stimulus metadata
 #'
 #' @param meta Data frame containing `wavelength` and `stim_nd`.
-#' @param calib Calibration table with `wavelength`, `stim_nd`, `log_hv`.
+#' @param calib Calibration table containing `wavelength`, `stim_nd`, and
+#'   `log_hv`.
 #'
-#' @return Input metadata with `log_hv`.
+#' @return Input metadata with `log_hv` added.
 #' @export
 nd_to_log_irradiance <- function(meta, calib) {
   required_meta <- c("wavelength", "stim_nd")
   required_calib <- c("wavelength", "stim_nd", "log_hv")
 
-  if (!all(required_meta %in% names(meta))) {
+  missing_meta <- setdiff(required_meta, names(meta))
+  missing_calib <- setdiff(required_calib, names(calib))
+
+  if (length(missing_meta) > 0L) {
     stop(
       "`meta` must contain columns: ",
       paste(required_meta, collapse = ", "),
@@ -70,7 +90,7 @@ nd_to_log_irradiance <- function(meta, calib) {
     )
   }
 
-  if (!all(required_calib %in% names(calib))) {
+  if (length(missing_calib) > 0L) {
     stop(
       "`calib` must contain columns: ",
       paste(required_calib, collapse = ", "),
@@ -79,10 +99,17 @@ nd_to_log_irradiance <- function(meta, calib) {
   }
 
   meta |>
-    dplyr::mutate(wavelength = as.character(.data$wavelength)) |>
+    dplyr::mutate(
+      wavelength = as.character(.data$wavelength),
+      stim_nd = as.numeric(.data$stim_nd)
+    ) |>
     dplyr::left_join(
       calib |>
-        dplyr::mutate(wavelength = as.character(.data$wavelength)),
+        dplyr::mutate(
+          wavelength = as.character(.data$wavelength),
+          stim_nd = as.numeric(.data$stim_nd),
+          log_hv = as.numeric(.data$log_hv)
+        ),
       by = c("wavelength", "stim_nd")
     )
 }
@@ -90,28 +117,36 @@ nd_to_log_irradiance <- function(meta, calib) {
 
 # Trace Trough-To-Peak Logic ----------------------------------------------
 
-#' Measure one trace using ERG trough-to-peak logic
+#' Measure one stimulus-response trace using windowed trough-to-peak logic
 #'
-#' Measure one trace using a windowed Origin-style approach
+#' Computes baseline, response summary values, trough-to-peak amplitude, a-wave
+#' estimate, and d-wave metrics from a single trace using configurable analysis
+#' windows.
 #'
-#' @param trace_df Single-trace data frame.
-#' @param baseline_window_ms Numeric length-2 vector for the main baseline.
-#' @param response_window_ms Numeric length-2 vector for the main response.
-#' @param stimulus_onset_ms Numeric scalar used only for absolute-time fallback.
+#' @param trace_df Single-trace data frame containing at least `time` and
+#'   `value`. If `time_reference = "stimulus"`, `time_rel_ms` may also be used
+#'   when available.
+#' @param baseline_window_ms Numeric length-2 vector for the main baseline
+#'   window. If `NULL`, a default is chosen based on `time_reference`.
+#' @param response_window_ms Numeric length-2 vector for the main response
+#'   window. If `NULL`, a default is chosen based on `time_reference`.
+#' @param stimulus_onset_ms Numeric scalar used only for absolute-time fallback
+#'   when computing post-stimulus timing values. Default is `400`.
 #' @param time_reference One of `"absolute"` or `"stimulus"`.
 #' @param trough_search_window_ms Numeric length-2 vector for the main trough
 #'   search. If `NULL`, defaults to `response_window_ms`.
 #' @param peak_search_window_ms Numeric length-2 vector for the main peak
 #'   search. If `NULL`, defaults to `response_window_ms`.
 #' @param dwave_baseline_window_ms Numeric length-2 vector for the d-wave
-#'   baseline.
+#'   baseline window. If `NULL`, a default is chosen based on `time_reference`.
 #' @param dwave_window_ms Numeric length-2 vector for the overall d-wave window.
-#' @param dwave_trough_search_window_ms Numeric length-2 vector for late trough
-#'   search. Used for diagnostic timing output.
-#' @param dwave_peak_search_window_ms Numeric length-2 vector for late peak
-#'   search. Used for d-wave amplitude and timing output.
+#'   If `NULL`, a default is chosen based on `time_reference`.
+#' @param dwave_trough_search_window_ms Numeric length-2 vector for the d-wave
+#'   trough search. If `NULL`, defaults to `dwave_window_ms`.
+#' @param dwave_peak_search_window_ms Numeric length-2 vector for the d-wave
+#'   peak search. If `NULL`, defaults to `dwave_window_ms`.
 #'
-#' @return One-row tibble.
+#' @return A one-row tibble containing trace-level measurements.
 #' @export
 measure_trace_window <- function(trace_df,
                                  baseline_window_ms = NULL,
@@ -126,6 +161,17 @@ measure_trace_window <- function(trace_df,
                                  dwave_peak_search_window_ms = NULL) {
   time_reference <- match.arg(time_reference)
 
+  needed <- c("time", "value")
+  missing_cols <- setdiff(needed, names(trace_df))
+
+  if (length(missing_cols) > 0L) {
+    stop(
+      "`trace_df` must contain columns: ",
+      paste(needed, collapse = ", "),
+      call. = FALSE
+    )
+  }
+
   trace_df <- trace_df |>
     dplyr::mutate(
       time_ms = zeus_time_to_ms(.data$time)
@@ -138,7 +184,6 @@ measure_trace_window <- function(trace_df,
 
   time_col <- if (use_relative) "time_rel_ms" else "time_ms"
 
-  # Tuned windows
   if (is.null(baseline_window_ms)) {
     baseline_window_ms <- if (use_relative) c(-100, 0) else c(300, 400)
   }
@@ -171,7 +216,6 @@ measure_trace_window <- function(trace_df,
     dwave_peak_search_window_ms <- dwave_window_ms
   }
 
-  # Main baseline and response windows
   base_df <- trace_df |>
     dplyr::filter(
       .data[[time_col]] >= baseline_window_ms[1],
@@ -210,7 +254,6 @@ measure_trace_window <- function(trace_df,
   response_mean_mv <- mean(resp_df$value, na.rm = TRUE)
   response_integral_mv <- response_mean_mv - baseline_mv
 
-  # Main windowed trough / peak (a/b-wave)
   trough_candidates <- trace_df |>
     dplyr::filter(
       .data[[time_col]] >= trough_search_window_ms[1],
@@ -265,7 +308,6 @@ measure_trace_window <- function(trace_df,
 
   awave_mv <- min_val + noise_pp_mv
 
-  # d-wave baseline and late peak/trough diagnostics
   dwave_base_df <- trace_df |>
     dplyr::filter(
       .data[[time_col]] >= dwave_baseline_window_ms[1],
@@ -294,7 +336,6 @@ measure_trace_window <- function(trace_df,
 
     dpeak_val <- dpeak_row$value[[1]]
     dpeak_time_current <- dpeak_row[[time_col]][[1]]
-
     dwave_mv <- dpeak_val - dwave_baseline_mv
   } else {
     dwave_baseline_mv <- NA_real_
@@ -320,38 +361,28 @@ measure_trace_window <- function(trace_df,
     awave_mv = awave_mv,
     trough_time_ms = trough_time_current,
     peak_time_ms = peak_time_current,
-    trough_time_poststim_ms = if (use_relative) {
-      trough_time_current
-    } else {
-      trough_time_current - stimulus_onset_ms
-    },
-    peak_time_poststim_ms = if (use_relative) {
-      peak_time_current
-    } else {
-      peak_time_current - stimulus_onset_ms
-    },
+    trough_time_poststim_ms = if (use_relative) trough_time_current else trough_time_current - stimulus_onset_ms,
+    peak_time_poststim_ms = if (use_relative) peak_time_current else peak_time_current - stimulus_onset_ms,
     dwave_baseline_mv = dwave_baseline_mv,
     dwave_mv = dwave_mv,
     dtrough_time_ms = dtrough_time_current,
     dpeak_time_ms = dpeak_time_current,
-    dtrough_time_poststim_ms = if (use_relative) {
-      dtrough_time_current
-    } else {
-      dtrough_time_current - stimulus_onset_ms
-    },
-    dpeak_time_poststim_ms = if (use_relative) {
-      dpeak_time_current
-    } else {
-      dpeak_time_current - stimulus_onset_ms
-    }
+    dtrough_time_poststim_ms = if (use_relative) dtrough_time_current else dtrough_time_current - stimulus_onset_ms,
+    dpeak_time_poststim_ms = if (use_relative) dpeak_time_current else dpeak_time_current - stimulus_onset_ms
   )
 }
+
 
 # Extract Measurement Table -----------------------------------------------
 
 #' Extract an Irrad-wl-Amp-style measurement table
 #'
-#' @param x A `zeus_stimresp` object.
+#' Computes one-row-per-trace summary measurements from averaged stimulus-
+#' response traces and optionally joins a calibration table containing log
+#' irradiance values.
+#'
+#' @param x A ZEUS object containing `traces_70`. Objects of class
+#'   `"zeus_stimresp"` and `"zeus_abf"` are accepted.
 #' @param calib Optional calibration table.
 #' @param baseline_window_ms Numeric length-2 vector for the main baseline.
 #' @param response_window_ms Numeric length-2 vector for the main response.
@@ -371,7 +402,7 @@ measure_trace_window <- function(trace_df,
 #' @param dwave_peak_search_window_ms Numeric length-2 vector for the d-wave
 #'   peak search window.
 #'
-#' @return Tibble with one row per StimResp trace.
+#' @return Tibble with one row per stimulus-response trace.
 #' @export
 extract_irrad_wl_amp <- function(x,
                                  calib = NULL,
@@ -388,21 +419,24 @@ extract_irrad_wl_amp <- function(x,
                                  dwave_peak_search_window_ms = NULL) {
   time_reference <- match.arg(time_reference)
 
-  if (!inherits(x, "zeus_stimresp")) {
-    stop("`x` must be a 'zeus_stimresp' object.", call. = FALSE)
+  if (!inherits(x, "zeus_stimresp") && !inherits(x, "zeus_abf")) {
+    stop("`x` must be a ZEUS object containing averaged stimulus-response traces.", call. = FALSE)
+  }
+
+  if (is.null(x$traces_70)) {
+    stop("`x` does not contain `traces_70`.", call. = FALSE)
   }
 
   stimresp_70 <- x$traces_70
 
+  group_cols <- c("stim_index", "stim_label")
+  optional_group_cols <- c("protocol_id", "protocol_variant", "wavelength", "stim_nd")
+
+  present_optional <- intersect(optional_group_cols, names(stimresp_70))
+  group_cols <- c(group_cols, present_optional)
+
   out <- stimresp_70 |>
-    dplyr::group_by(
-      .data$stim_index,
-      .data$protocol_id,
-      .data$protocol_variant,
-      .data$wavelength,
-      .data$stim_nd,
-      .data$stim_label
-    ) |>
+    dplyr::group_by(dplyr::across(dplyr::all_of(group_cols))) |>
     dplyr::group_modify(~ measure_trace_window(
       trace_df = .x,
       baseline_window_ms = baseline_window_ms,
@@ -436,12 +470,11 @@ extract_irrad_wl_amp <- function(x,
     }
   }
 
+  relocate_cols <- intersect(
+    c("stim_index", "stim_label", "wavelength", "stim_nd", "log_hv"),
+    names(out)
+  )
+
   out |>
-    dplyr::relocate(
-      .data$stim_index,
-      .data$stim_label,
-      .data$wavelength,
-      .data$stim_nd,
-      .data$log_hv
-    )
+    dplyr::relocate(dplyr::all_of(relocate_cols))
 }

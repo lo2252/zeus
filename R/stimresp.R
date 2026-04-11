@@ -1,210 +1,118 @@
 # Build Stimulus Response -------------------------------------------------
 
-#' Build a StimResp object from ABF data
+#' Build stimulus-response traces
 #'
-#' This function:
-#' 1. imports raw ABF data,
-#' 2. maps raw sweeps to a registered protocol,
-#' 3. optionally excludes noisy technical replicates,
-#' 4. averages technical replicates into 70 StimResp traces,
-#' 5. post-processes the averaged StimResp traces,
-#' 6. computes optional white-light means for C1.
+#' Applies the standard StimResp pipeline to labeled replicate-level ERG traces:
+#' optional per-sweep baseline correction, optional noisy-replicate exclusion,
+#' replicate averaging, and optional post-averaging smoothing.
 #'
-#' Build a StimResp object from ABF data
+#' @param traces_280 A long replicate-level trace table containing at least
+#'   `sweep`, `stim_index`, `stim_label`, `time_ms`, and `value`.
+#' @param stimresp_zero_baseline Logical; whether to baseline-correct each sweep
+#'   before averaging. Default is `TRUE`.
+#' @param stimresp_baseline_window_ms Numeric length-2 vector giving the
+#'   baseline window in milliseconds. Default is `c(300, 400)`.
+#' @param stimresp_exclude_noisy Logical; whether to exclude noisy technical
+#'   replicates before averaging. Default is `TRUE`.
+#' @param stimresp_noise_window_ms Numeric length-2 vector giving the time
+#'   window in milliseconds used to estimate replicate-level standard deviation.
+#'   Default is `c(300, 1000)`.
+#' @param stimresp_noise_ratio_cutoff Numeric cutoff applied to the within-group
+#'   SD ratio. Replicates with `sd_ratio >= stimresp_noise_ratio_cutoff` are
+#'   removed before averaging. Default is `1.5`.
+#' @param stimresp_runmean_k Integer running-average width applied after
+#'   replicate averaging. Use `1L` for no running average. Default is `16L`.
+#' @param stimresp_sg_smooth Logical; whether to apply Savitzky-Golay smoothing
+#'   after replicate averaging. Default is `TRUE`.
+#' @param stimresp_sg_n Odd integer Savitzky-Golay window size. If even, it is
+#'   incremented to the next odd integer. Default is `101L`.
+#' @param stimresp_sg_p Integer Savitzky-Golay polynomial order. Default is `2L`.
 #'
-#' @param x File path or `zeus_abf_raw` object.
-#' @param protocol Protocol id. (`"C0"` or `"C1"`).
-#' @param erg_channel ERG channel value in `abf_as_df_long()`.
-#' @param pc_channel Photocell channel value in `abf_as_df_long()`.
-#' @param repeats_per_stim Technical replicates per stimulus.
-#' @param expected_stim Number of stimulus conditions.
-#' @param exclude_noisy Logical.
-#' @param noise_threshold Numeric SD-ratio threshold.
-#' @param zero_baseline Logical.
-#' @param baseline_window_ms Numeric length-2 vector.
-#' @param smooth_n Running mean window size.
-#' @param align_to_stimulus One of `"protocol"` or `"photocell"`.
-#' @param photocell_baseline_window_ms Numeric length-2 vector for photocell baseline.
-#' @param photocell_threshold_frac Fraction of photocell rise used for onset detection.
-#'
-#' @return Object of class `"zeus_stimresp"`.
-#' @export
-build_stimresp <- function(x,
-                           protocol = c("C0", "C1"),
-                           erg_channel = "ERG DAM80",
-                           pc_channel = "Photocell",
-                           repeats_per_stim = 4L,
-                           expected_stim = 70L,
-                           exclude_noisy = FALSE,
-                           noise_threshold = 1.5,
-                           zero_baseline = TRUE,
-                           baseline_window_ms = c(300, 400),
-                           smooth_n = 1L,
-                           align_to_stimulus = c("protocol", "photocell"),
-                           photocell_baseline_window_ms = c(0, 300),
-                           photocell_threshold_frac = 0.5) {
-  protocol <- match.arg(protocol)
-  align_to_stimulus <- match.arg(align_to_stimulus)
+#' @return A list with:
+#' \describe{
+#'   \item{traces_70}{Averaged and optionally smoothed stimulus-response traces.}
+#'   \item{stimresp_qc}{Per-sweep noisy-replicate QC summary.}
+#' }
+#' @keywords internal
+build_stimresp <- function(traces_280,
+                           stimresp_zero_baseline = TRUE,
+                           stimresp_baseline_window_ms = c(300, 400),
+                           stimresp_exclude_noisy = TRUE,
+                           stimresp_noise_window_ms = c(300, 1000),
+                           stimresp_noise_ratio_cutoff = 1.5,
+                           stimresp_runmean_k = 16L,
+                           stimresp_sg_smooth = TRUE,
+                           stimresp_sg_n = 101L,
+                           stimresp_sg_p = 2L) {
+  needed <- c("sweep", "stim_index", "stim_label", "time_ms", "value")
+  missing_cols <- setdiff(needed, names(traces_280))
 
-  raw_obj <- if (inherits(x, "zeus_abf_raw")) {
-    x
-  } else {
-    read_abf_raw(x)
-  }
-
-  df_long <- abf_as_df_long(raw_obj$raw)
-  validate_long_abf_df(df_long)
-
-  erg_df <- extract_channel_trace_df(df_long, erg_channel)
-  pc_df  <- extract_channel_trace_df(df_long, pc_channel)
-
-  sweep_ids <- sort(unique(erg_df$sweep))
-  expected_sweeps <- as.integer(expected_stim) * as.integer(repeats_per_stim)
-
-  if (length(sweep_ids) < expected_sweeps) {
+  if (length(missing_cols) > 0L) {
     stop(
-      "Expected at least ", expected_sweeps,
-      " ERG sweeps, found ", length(sweep_ids), ".",
+      "Missing required columns in `traces_280`: ",
+      paste(missing_cols, collapse = ", "),
       call. = FALSE
     )
   }
 
-  if (length(sweep_ids) > expected_sweeps) {
-    warning(
-      "Found ", length(sweep_ids), " ERG sweeps; using first ",
-      expected_sweeps, " sweeps."
-    )
-    sweep_ids <- sweep_ids[seq_len(expected_sweeps)]
+  traces_proc <- traces_280
 
-    erg_df <- erg_df |>
-      dplyr::filter(.data$sweep %in% sweep_ids)
-
-    pc_df <- pc_df |>
-      dplyr::filter(.data$sweep %in% sweep_ids)
+  if (isTRUE(stimresp_zero_baseline)) {
+    traces_proc <- traces_proc |>
+      dplyr::group_by(.data$sweep) |>
+      dplyr::group_modify(~ baseline_one_trace(
+        .x,
+        baseline_window_ms = stimresp_baseline_window_ms
+      )) |>
+      dplyr::ungroup()
   }
 
-  protocol_tbl <- switch(
-    protocol,
-    C0 = protocol_table_C0(),
-    C1 = protocol_table_C1()
+  avg_obj <- average_stimresp_reps(
+    df = traces_proc,
+    exclude_noisy = stimresp_exclude_noisy,
+    noise_window_ms = stimresp_noise_window_ms,
+    noise_ratio_cutoff = stimresp_noise_ratio_cutoff
   )
 
-  protocol_sweeps <- expand_protocol_repeats(
-    protocol_tbl = protocol_tbl,
-    repeats_per_stim = repeats_per_stim
-  ) |>
-    dplyr::mutate(
-      sweep = sweep_ids,
-      .before = 1
-    )
+  traces_70 <- avg_obj$avg
 
-  erg_labeled <- erg_df |>
-    dplyr::left_join(protocol_sweeps, by = "sweep")
-
-  if (any(is.na(erg_labeled$stim_index))) {
-    stop("Protocol join failed for one or more sweeps.", call. = FALSE)
+  if (isTRUE(stimresp_sg_smooth) || as.integer(stimresp_runmean_k) > 1L) {
+    traces_70 <- traces_70 |>
+      dplyr::group_by(.data$stim_index) |>
+      dplyr::group_modify(~ smooth_one_trace(
+        .x,
+        runmean_k = stimresp_runmean_k,
+        sg_n = if (isTRUE(stimresp_sg_smooth)) stimresp_sg_n else 1L,
+        sg_p = stimresp_sg_p
+      )) |>
+      dplyr::ungroup()
   }
 
-  # Add stimulus onset alignment
-  if (identical(align_to_stimulus, "photocell")) {
-    onset_df <- compute_photocell_onsets(
-      pc_df = pc_df,
-      baseline_window_ms = photocell_baseline_window_ms,
-      threshold_frac = photocell_threshold_frac
-    )
-  } else {
-    onset_df <- tibble::tibble(
-      sweep = sweep_ids,
-      stim_onset_ms = 0
-    )
-  }
-
-  erg_labeled <- add_relative_time_cols(
-    df = erg_labeled,
-    onset_df = onset_df,
-    by = "sweep",
-    onset_col = "stim_onset_ms"
-  )
-
-  noisy_flags <- NULL
-
-  if (isTRUE(exclude_noisy)) {
-    noisy_flags <- compute_noisy_trace_flags(
-      erg_labeled = erg_labeled,
-      response_window_ms = c(300, 1000),
-      noise_threshold = noise_threshold
-    )
-
-    erg_labeled <- erg_labeled |>
-      dplyr::left_join(
-        noisy_flags |>
-          dplyr::select(.data$sweep, .data$trace_sd, .data$sd_ratio, .data$keep),
-        by = "sweep"
-      ) |>
-      dplyr::filter(is.na(.data$keep) | .data$keep)
-  }
-
-  stimresp_70 <- average_technical_replicates(erg_labeled)
-
-  stimresp_70 <- postprocess_stimresp_70(
-    stimresp_70 = stimresp_70,
-    smooth_n = smooth_n,
-    zero_baseline = zero_baseline,
-    baseline_window_ms = baseline_window_ms,
-    time_reference = if (identical(align_to_stimulus, "photocell")) "stimulus" else "absolute"
-  )
-
-  photocell <- pc_df |>
-    dplyr::filter(.data$sweep == min(.data$sweep, na.rm = TRUE)) |>
-    dplyr::mutate(
-      time_ms = zeus_time_to_ms(.data$time)
-    )
-
-  white_ir_means <- NULL
-  if (identical(protocol, "C1")) {
-    white_ir_means <- compute_white_ir_means(stimresp_70)
-  }
-
-  structure(
-    list(
-      raw_abf = raw_obj,
-      traces_280 = erg_labeled,
-      traces_70 = stimresp_70,
-      protocol_70 = protocol_tbl,
-      protocol_280 = protocol_sweeps,
-      photocell = photocell,
-      photocell_onsets = onset_df,
-      white_ir_means = white_ir_means,
-      noisy_flags = noisy_flags,
-      settings = list(
-        protocol = protocol,
-        erg_channel = erg_channel,
-        pc_channel = pc_channel,
-        repeats_per_stim = repeats_per_stim,
-        expected_stim = expected_stim,
-        exclude_noisy = exclude_noisy,
-        noise_threshold = noise_threshold,
-        zero_baseline = zero_baseline,
-        baseline_window_ms = baseline_window_ms,
-        smooth_n = smooth_n,
-        align_to_stimulus = align_to_stimulus,
-        photocell_baseline_window_ms = photocell_baseline_window_ms,
-        photocell_threshold_frac = photocell_threshold_frac
-      )
-    ),
-    class = c("zeus_stimresp", "list")
+  list(
+    traces_70 = traces_70,
+    stimresp_qc = avg_obj$qc
   )
 }
 
-# Computes Noisy Traces ---------------------------------------------------
+# Noisy replicate detection -----------------------------------------------
 
-#' Compute noisy traces within technical replicate groups
+#' Compute noisy replicate flags within stimulus groups
 #'
-#' @param erg_labeled Long ERG data with `stim_index`.
-#' @param response_window_ms Numeric length-2 vector.
-#' @param noise_threshold Numeric threshold on SD ratio.
+#' For each stimulus group, the replicate-level standard deviation is computed
+#' within a specified response window. Each replicate SD is divided by the
+#' minimum SD within the same stimulus group to form an SD ratio. Replicates
+#' with ratios greater than or equal to the supplied threshold are flagged for
+#' exclusion.
 #'
-#' @return Tibble with one row per sweep.
+#' @param erg_labeled Long ERG data with at least `sweep`, `time`, `value`, and
+#'   `stim_index`.
+#' @param response_window_ms Numeric length-2 vector giving the response window
+#'   in milliseconds. Default is `c(300, 1000)`.
+#' @param noise_threshold Numeric SD-ratio threshold. Replicates with
+#'   `sd_ratio >= noise_threshold` are flagged as noisy. Default is `1.5`.
+#'
+#' @return A tibble with one row per sweep containing replicate-level noise
+#'   metrics and a logical `keep` column.
 #' @export
 compute_noisy_trace_flags <- function(erg_labeled,
                                       response_window_ms = c(300, 1000),
@@ -235,23 +143,31 @@ compute_noisy_trace_flags <- function(erg_labeled,
     dplyr::mutate(
       min_sd = min(.data$trace_sd, na.rm = TRUE),
       sd_ratio = .data$trace_sd / .data$min_sd,
-      keep = .data$sd_ratio < noise_threshold
+      keep = is.finite(.data$sd_ratio) & (.data$sd_ratio < noise_threshold)
     ) |>
     dplyr::ungroup()
 }
 
-# Zero Baseline: raw traces -----------------------------------------------
+# Zero baseline: raw traces -----------------------------------------------
 
 #' Zero baseline within each raw sweep trace
 #'
-#' @param erg_df Long ERG data with a `sweep` column.
-#' @param baseline_window_ms Numeric length-2 vector.
+#' @param erg_df Long ERG data with `sweep`, `time`, and `value`.
+#' @param baseline_window_ms Numeric length-2 vector giving the baseline window
+#'   in milliseconds. Default is `c(300, 400)`.
 #'
 #' @return Long ERG data with baseline-zeroed `value`.
 #' @export
 zero_baseline_traces <- function(erg_df, baseline_window_ms = c(300, 400)) {
-  if (!"sweep" %in% names(erg_df)) {
-    stop("`erg_df` must contain a `sweep` column.", call. = FALSE)
+  needed <- c("sweep", "time", "value")
+  missing_cols <- setdiff(needed, names(erg_df))
+
+  if (length(missing_cols) > 0L) {
+    stop(
+      "Missing required columns in `erg_df`: ",
+      paste(missing_cols, collapse = ", "),
+      call. = FALSE
+    )
   }
 
   erg_df |>
@@ -268,7 +184,7 @@ zero_baseline_traces <- function(erg_df, baseline_window_ms = c(300, 400)) {
       value = .data$value - .data$baseline
     ) |>
     dplyr::ungroup() |>
-    dplyr::select(-.data$baseline, -.data$time_ms)
+    dplyr::select(-.data$baseline)
 }
 
 # Smoothing: raw traces ---------------------------------------------------
@@ -276,42 +192,33 @@ zero_baseline_traces <- function(erg_df, baseline_window_ms = c(300, 400)) {
 #' Smooth raw traces with a running mean
 #'
 #' @param erg_df Long ERG data with a `sweep` column.
-#' @param n Integer window size.
+#' @param n Integer running-mean window size. Use `1L` for no smoothing.
 #'
 #' @return Long ERG data with smoothed `value`.
 #' @export
 smooth_stimresp_traces <- function(erg_df, n = 1L) {
   n <- as.integer(n)
 
-  if (!"sweep" %in% names(erg_df)) {
-    stop("`erg_df` must contain a `sweep` column.", call. = FALSE)
-  }
-
-  if (n <= 1L) {
-    return(erg_df)
-  }
-
   erg_df |>
     dplyr::group_by(.data$sweep) |>
     dplyr::arrange(.data$time, .by_group = TRUE) |>
-    dplyr::mutate(
-      value = run_mean(.data$value, n = n)
-    ) |>
+    dplyr::mutate(value = run_mean(.data$value, n = n)) |>
     dplyr::ungroup()
 }
 
-# Averaging Replicates ----------------------------------------------------
+# Averaging technical replicates ------------------------------------------
 
-#' Average technical replicates into StimResp traces
+#' Average technical replicates into stimulus-response traces
 #'
-#' @param erg_labeled Long ERG data with protocol labels.
+#' Averages technical replicates that share the same stimulus identity and time
+#' coordinate.
 #'
-#' @return 70-trace StimResp tibble.
+#' @param erg_labeled Long ERG data with protocol labels and stimulus metadata.
+#'
+#' @return A 70-trace stimulus-response tibble.
 #' @export
 average_technical_replicates <- function(erg_labeled) {
-  has_onset <- "stim_onset_ms" %in% names(erg_labeled)
-
-  out <- erg_labeled |>
+  erg_labeled |>
     dplyr::group_by(
       .data$stim_index,
       .data$protocol_id,
@@ -326,36 +233,31 @@ average_technical_replicates <- function(erg_labeled) {
     dplyr::summarise(
       value = mean(.data$value, na.rm = TRUE),
       n_repeats_used = dplyr::n_distinct(.data$sweep),
-      stim_onset_ms = if (has_onset) {
-        mean(.data$stim_onset_ms, na.rm = TRUE)
-      } else {
-        NA_real_
-      },
       .groups = "drop"
     ) |>
     dplyr::mutate(
       stim_label = purrr::pmap_chr(
         list(.data$wavelength, .data$stim_nd, .data$stim_index, .data$protocol_id),
         make_stimresp_label
-      ),
-      time_ms = zeus_time_to_ms(.data$time),
-      time_rel_ms = .data$time_ms - .data$stim_onset_ms
+      )
     )
-
-  out
 }
 
-# Post-process averaged StimResp traces -----------------------------------
+# Post-process averaged traces --------------------------------------------
 
-#' Post-process averaged StimResp traces
+#' Post-process averaged stimulus-response traces
 #'
-#' @param stimresp_70 A 70-trace StimResp tibble.
+#' Applies optional running-mean smoothing and optional baseline subtraction to
+#' already averaged traces.
+#'
+#' @param stimresp_70 A 70-trace stimulus-response tibble.
 #' @param smooth_n Integer running-mean window size.
-#' @param zero_baseline Logical.
-#' @param baseline_window_ms Numeric length-2 vector in milliseconds.
+#' @param zero_baseline Logical; whether to subtract a baseline from each trace.
+#' @param baseline_window_ms Numeric length-2 vector giving the baseline window
+#'   in milliseconds.
 #' @param time_reference One of `"absolute"` or `"stimulus"`.
 #'
-#' @return A post-processed StimResp tibble.
+#' @return A post-processed stimulus-response tibble.
 #' @export
 postprocess_stimresp_70 <- function(stimresp_70,
                                     smooth_n = 1L,
@@ -445,13 +347,13 @@ postprocess_stimresp_70 <- function(stimresp_70,
   out
 }
 
-# C1 Mean Trace -----------------------------------------------------------
+# C1 mean trace -----------------------------------------------------------
 
-#' Compute C1 mean traces by ND across 10 runs
+#' Compute white-light mean traces by neutral density across runs
 #'
-#' @param stimresp_70 A 70-trace StimResp tibble.
+#' @param stimresp_70 A 70-trace stimulus-response tibble.
 #'
-#' @return Tibble with 7 mean white-light intensity traces.
+#' @return Tibble with mean white-light traces by neutral density.
 #' @export
 compute_white_ir_means <- function(stimresp_70) {
   stimresp_70 |>
@@ -468,9 +370,7 @@ compute_white_ir_means <- function(stimresp_70) {
     )
 }
 
-
-
-# Photocell onset detection ------------------------------------------------
+# Photocell onset detection -----------------------------------------------
 
 #' Detect stimulus onset from a single photocell trace
 #'
@@ -495,7 +395,7 @@ detect_photocell_onset_single <- function(time,
     return(NA_real_)
   }
 
-  baseline_val <- median(signal[baseline_idx], na.rm = TRUE)
+  baseline_val <- stats::median(signal[baseline_idx], na.rm = TRUE)
   peak_val <- max(signal, na.rm = TRUE)
 
   if (!is.finite(baseline_val) || !is.finite(peak_val) || peak_val <= baseline_val) {
@@ -513,7 +413,7 @@ detect_photocell_onset_single <- function(time,
   time_ms[onset_idx]
 }
 
-# Compute Photocell -------------------------------------------------------
+# Compute photocell onsets ------------------------------------------------
 
 #' Compute photocell-based stimulus onset for each sweep
 #'
@@ -589,4 +489,319 @@ add_relative_time_cols <- function(df,
       time_ms = zeus_time_to_ms(.data$time),
       time_rel_ms = .data$time_ms - .data[[onset_col]]
     )
+}
+
+# StimResp post-processing ------------------------------------------------
+
+#' Apply StimResp processing to averaged traces
+#'
+#' Applies the following steps to averaged traces:
+#' \enumerate{
+#'   \item optional running average
+#'   \item optional baseline subtraction
+#'   \item optional endpoint-ramp drift correction
+#'   \item optional Savitzky-Golay smoothing
+#' }
+#'
+#' @param stimresp_70 A 70-trace averaged stimulus-response tibble.
+#' @param runmean_k Integer running-average window size. Use `1L` for none.
+#' @param zero_baseline Logical; subtract a baseline from each averaged trace.
+#' @param baseline_window_ms Numeric length-2 vector giving the baseline window.
+#' @param drift_correct Logical; subtract a linear ramp estimated from the final
+#'   `drift_tail_n` points.
+#' @param drift_tail_n Integer number of final points used to estimate drift.
+#' @param sg_smooth Logical; whether to apply Savitzky-Golay smoothing.
+#' @param sg_n Integer SG window size. If even, it is incremented to the next
+#'   odd integer.
+#' @param sg_p Integer SG polynomial order.
+#'
+#' @return Processed stimulus-response tibble.
+#' @keywords internal
+apply_stimresp_postprocess <- function(stimresp_70,
+                                       runmean_k = 1L,
+                                       zero_baseline = TRUE,
+                                       baseline_window_ms = c(300, 400),
+                                       drift_correct = FALSE,
+                                       drift_tail_n = 100L,
+                                       sg_smooth = TRUE,
+                                       sg_n = 101L,
+                                       sg_p = 2L) {
+  runmean_k <- as.integer(runmean_k)
+  drift_tail_n <- as.integer(drift_tail_n)
+  sg_n <- as.integer(sg_n)
+  sg_p <- as.integer(sg_p)
+
+  if (sg_n %% 2L == 0L) {
+    sg_n <- sg_n + 1L
+  }
+
+  stimresp_70 |>
+    dplyr::mutate(time_ms = zeus_time_to_ms(.data$time)) |>
+    dplyr::group_by(.data$stim_index) |>
+    dplyr::arrange(.data$time, .by_group = TRUE) |>
+    dplyr::group_modify(~{
+      df <- .x
+
+      if (runmean_k > 1L) {
+        df <- df |>
+          dplyr::mutate(
+            value = zoo::rollmean(.data$value, k = runmean_k, fill = "extend")
+          )
+      }
+
+      baseline_mv <- NA_real_
+      if (isTRUE(zero_baseline)) {
+        baseline_mv <- mean(
+          df$value[
+            df$time_ms >= baseline_window_ms[1] &
+              df$time_ms <= baseline_window_ms[2]
+          ],
+          na.rm = TRUE
+        )
+
+        df <- df |>
+          dplyr::mutate(
+            value = .data$value - baseline_mv
+          )
+      }
+
+      drift_tail_mean <- NA_real_
+      if (isTRUE(drift_correct)) {
+        n_pts <- nrow(df)
+        tail_idx <- seq.int(max(1L, n_pts - drift_tail_n + 1L), n_pts)
+
+        drift_tail_mean <- mean(df$value[tail_idx], na.rm = TRUE)
+
+        drift_ramp <- seq(
+          from = 0,
+          to = drift_tail_mean,
+          length.out = n_pts
+        )
+
+        df <- df |>
+          dplyr::mutate(
+            value = .data$value - drift_ramp
+          )
+      }
+
+      if (isTRUE(sg_smooth)) {
+        df <- df |>
+          dplyr::mutate(
+            value = signal::sgolayfilt(.data$value, p = sg_p, n = sg_n)
+          )
+      }
+
+      df |>
+        dplyr::mutate(
+          baseline_mv = baseline_mv,
+          drift_tail_mean = drift_tail_mean
+        )
+    }) |>
+    dplyr::ungroup()
+}
+
+# Internal helpers --------------------------------------------------------
+
+#' Baseline-correct one trace
+#'
+#' @param df Data frame with columns `time_ms` and `value`.
+#' @param baseline_window_ms Numeric length-2 vector giving the baseline window
+#'   in milliseconds.
+#'
+#' @return A data frame with baseline-corrected `value`.
+#' @keywords internal
+baseline_one_trace <- function(df, baseline_window_ms = c(300, 400)) {
+  base_vals <- df$value[
+    df$time_ms >= baseline_window_ms[1] &
+      df$time_ms <= baseline_window_ms[2]
+  ]
+
+  base_val <- if (length(base_vals) == 0L || all(is.na(base_vals))) {
+    0
+  } else {
+    mean(base_vals, na.rm = TRUE)
+  }
+
+  if (!is.finite(base_val)) {
+    base_val <- 0
+  }
+
+  df |>
+    dplyr::mutate(value = value - base_val)
+}
+
+#' Compute replicate-level noise metrics for StimResp
+#'
+#' For each stimulus group, compute the standard deviation over the supplied
+#' noise window for each technical replicate, normalize each replicate SD by the
+#' minimum SD in that group, and flag replicates with ratios below the cutoff.
+#'
+#' @param df Data frame with columns `stim_index`, `sweep`, `time_ms`, and
+#'   `value`.
+#' @param noise_window_ms Numeric length-2 vector giving the SD window in
+#'   milliseconds.
+#' @param noise_ratio_cutoff Numeric cutoff. Replicates with
+#'   `sd_ratio >= noise_ratio_cutoff` are dropped.
+#'
+#' @return A data frame with per-replicate noise metrics and a logical `keep`
+#'   column.
+#' @keywords internal
+compute_stimresp_noise_flags <- function(df,
+                                         noise_window_ms = c(300, 1000),
+                                         noise_ratio_cutoff = 1.5) {
+  df |>
+    dplyr::group_by(.data$stim_index, .data$sweep) |>
+    dplyr::summarise(
+      sweep_sd = stats::sd(
+        .data$value[
+          .data$time_ms >= noise_window_ms[1] &
+            .data$time_ms <= noise_window_ms[2]
+        ],
+        na.rm = TRUE
+      ),
+      .groups = "drop"
+    ) |>
+    dplyr::group_by(.data$stim_index) |>
+    dplyr::mutate(
+      min_sd_in_group = min(.data$sweep_sd, na.rm = TRUE),
+      sd_ratio = .data$sweep_sd / .data$min_sd_in_group,
+      keep = is.finite(.data$sd_ratio) & (.data$sd_ratio < noise_ratio_cutoff)
+    ) |>
+    dplyr::ungroup()
+}
+
+#' Average StimResp replicates with optional noisy-replicate exclusion
+#'
+#' @param df Data frame with columns `stim_index`, `stim_label`, `sweep`,
+#'   `time_ms`, and `value`.
+#' @param exclude_noisy Logical; whether to apply noisy-replicate exclusion.
+#' @param noise_window_ms Numeric length-2 vector giving the SD window in
+#'   milliseconds.
+#' @param noise_ratio_cutoff Numeric cutoff. Replicates with
+#'   `sd_ratio >= noise_ratio_cutoff` are dropped.
+#'
+#' @return A list with:
+#' \describe{
+#'   \item{avg}{Averaged traces.}
+#'   \item{qc}{Per-replicate QC summary.}
+#' }
+#' @keywords internal
+average_stimresp_reps <- function(df,
+                                  exclude_noisy = TRUE,
+                                  noise_window_ms = c(300, 1000),
+                                  noise_ratio_cutoff = 1.5) {
+  qc <- compute_stimresp_noise_flags(
+    df = df,
+    noise_window_ms = noise_window_ms,
+    noise_ratio_cutoff = noise_ratio_cutoff
+  )
+
+  df_use <- if (isTRUE(exclude_noisy)) {
+    df |>
+      dplyr::left_join(
+        qc |>
+          dplyr::select(.data$stim_index, .data$sweep, .data$keep),
+        by = c("stim_index", "sweep")
+      ) |>
+      dplyr::filter(.data$keep) |>
+      dplyr::select(-.data$keep)
+  } else {
+    df
+  }
+
+  avg <- df_use |>
+    dplyr::group_by(.data$stim_index, .data$stim_label, .data$time_ms) |>
+    dplyr::summarise(
+      value = mean(.data$value, na.rm = TRUE),
+      n_reps_used = dplyr::n_distinct(.data$sweep),
+      .groups = "drop"
+    )
+
+  list(avg = avg, qc = qc)
+}
+
+#' Smooth one averaged trace
+#'
+#' @param df Data frame with column `value`.
+#' @param runmean_k Integer running-mean window. Use `1L` for none.
+#' @param sg_n Odd integer Savitzky-Golay window size.
+#' @param sg_p Integer Savitzky-Golay polynomial order.
+#'
+#' @return Smoothed data frame.
+#' @keywords internal
+smooth_one_trace <- function(df,
+                             runmean_k = 16L,
+                             sg_n = 101L,
+                             sg_p = 2L) {
+  runmean_k <- as.integer(runmean_k)
+  sg_n <- as.integer(sg_n)
+  sg_p <- as.integer(sg_p)
+
+  if (sg_n %% 2L == 0L) {
+    sg_n <- sg_n + 1L
+  }
+
+  out <- df
+
+  if (runmean_k > 1L) {
+    out <- out |>
+      dplyr::mutate(
+        value = zoo::rollmean(.data$value, k = runmean_k, fill = "extend")
+      )
+  }
+
+  if (sum(is.finite(out$value)) >= sg_n) {
+    out <- out |>
+      dplyr::mutate(
+        value = signal::sgolayfilt(.data$value, p = sg_p, n = sg_n)
+      )
+  }
+
+  out
+}
+
+# StimResp QC summary -----------------------------------------------------
+
+#' Summarize StimResp noisy-replicate exclusion
+#'
+#' @param x A ZEUS object containing `stimresp_qc`.
+#'
+#' @return A list with:
+#' \describe{
+#'   \item{overall}{Overall counts of retained and excluded replicates.}
+#'   \item{by_stim}{Retained and excluded replicate counts by stimulus.}
+#'   \item{dropped}{A table of excluded replicates.}
+#' }
+#' @export
+summarize_stimresp_qc <- function(x) {
+  if (is.null(x$stimresp_qc)) {
+    stop("`x` does not contain `stimresp_qc`.", call. = FALSE)
+  }
+
+  overall <- x$stimresp_qc |>
+    dplyr::summarise(
+      total_sweeps = dplyr::n(),
+      kept_sweeps = sum(.data$keep, na.rm = TRUE),
+      dropped_sweeps = sum(!.data$keep, na.rm = TRUE),
+      drop_rate = mean(!.data$keep, na.rm = TRUE)
+    )
+
+  by_stim <- x$stimresp_qc |>
+    dplyr::group_by(.data$stim_index) |>
+    dplyr::summarise(
+      kept = sum(.data$keep, na.rm = TRUE),
+      dropped = sum(!.data$keep, na.rm = TRUE),
+      .groups = "drop"
+    ) |>
+    dplyr::arrange(dplyr::desc(.data$dropped), .data$stim_index)
+
+  dropped <- x$stimresp_qc |>
+    dplyr::filter(!.data$keep) |>
+    dplyr::arrange(.data$stim_index, .data$sweep)
+
+  list(
+    overall = overall,
+    by_stim = by_stim,
+    dropped = dropped
+  )
 }

@@ -77,90 +77,21 @@ make_stimresp_label <- function(wavelength,
 
 #' Compute a centered running mean
 #'
-#' Smoothing helper used for StimResp traces.
+#' Smoothing helper used for ZEUS traces.
 #' If `n = 1`, the input is returned unchanged.
-#' If `n > 1`, a centered moving average is applied.
+#' If `n > 1`, a centered moving average is applied with endpoint extension.
 #'
 #' @param x Numeric vector.
 #' @param n Integer smoothing window size.
 #'
-#' @return Numeric vector of approximately the same length as the input.
+#' @return Numeric vector of the same length as the input.
 #' @keywords internal
 run_mean <- function(x, n = 1L) {
-  # Convert window size to integer.
   n <- as.integer(n)
 
-  # No smoothing.
   if (n <= 1L) {
     return(x)
   }
 
-  # Apply a centered moving average.
-  stats::filter(x, rep(1 / n, n), sides = 2) |>
-    as.numeric()
-}
-
-
-# Validation of long-form ABF data ----------------------------------------
-
-#' Validate the long-form structure of ABF data
-#'
-#' Confirms that `abf_as_df_long()` returned the minimum columns ZEUS expects.
-#'
-#' Required columns:
-#' - `sweep`
-#' - `time`
-#' - `channel`
-#' - `value`
-#'
-#' This function does not modify the data. It only checks structure.
-#'
-#' @param df_long Data frame returned by `abf_as_df_long()`.
-#'
-#' @return Invisibly returns `df_long`.
-#' @keywords internal
-validate_long_abf_df <- function(df_long) {
-  needed <- c("sweep", "time", "channel", "value")
-  missing_cols <- setdiff(needed, names(df_long))
-
-  if (length(missing_cols) > 0L) {
-    stop(
-      "`abf_as_df_long()` must return columns: ",
-      paste(needed, collapse = ", "),
-      ". Missing: ",
-      paste(missing_cols, collapse = ", "),
-      call. = FALSE
-    )
-  }
-
-  invisible(df_long)
-}
-
-
-# Individual Channel Extraction -------------------------------------------
-
-#' Extract one channel from long-form ABF data
-#'
-#' Filters the long ABF data to a single channel, such as:
-#' - `"ERG DAM80"`
-#' - `"Photocell"`
-#' - numeric channel ids
-#'
-#' Used to separate ERG traces from photocell traces before building
-#' StimResp outputs.
-#'
-#' @param df_long Long-form ABF data.
-#' @param channel_value Channel identifier to keep.
-#'
-#' @return Filtered data frame containing only rows from the requested channel.
-#' @keywords internal
-extract_channel_trace_df <- function(df_long, channel_value) {
-  out <- df_long |>
-    dplyr::filter(.data$channel == channel_value)
-
-  if (nrow(out) == 0L) {
-    stop("No rows found for channel '", channel_value, "'.", call. = FALSE)
-  }
-
-  out
+  zoo::rollmean(x, k = n, fill = "extend")
 }
