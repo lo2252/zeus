@@ -3,11 +3,11 @@
 #' Import a raw ABF file into a ZEUS raw object
 #'
 #' @description
-#' Reads an Axon Binary Format (`.abf`) file using `readABF::readABF()` and
+#' Reads an Axon Binary Format (`.abf`) file using [readABF::readABF()] and
 #' wraps the result in a `zeus_abf_raw` object for downstream ZEUS processing.
 #'
 #' @param path Path to a `.abf` file.
-#' @param ... Additional arguments passed to `readABF::readABF()`.
+#' @param ... Additional arguments passed to [readABF::readABF()].
 #'
 #' @return An object of class `zeus_abf_raw`.
 #' @export
@@ -38,151 +38,184 @@ read_abf_raw <- function(path, ...) {
   )
 }
 
-
 # Read ABF wrapper --------------------------------------------------------
 
-#' Read ABF data into ZEUS
+#' Read an ABF file and build a ZEUS stimulus-response object
 #'
 #' @description
-#' User-facing import wrapper for ZEUS ABF files.
+#' Wrapper around [build_stimresp()] that reads an ABF file, extracts ERG and
+#' optional photocell channels, labels stimulus structure, and returns a
+#' structured `zeus_stimresp` object containing raw, replicate-level, and
+#' averaged stimulus-response outputs.
 #'
-#' This function can:
-#' \enumerate{
-#'   \item return the raw imported ABF object, or
-#'   \item build a StimResp-style processed object using a supported protocol.
-#' }
-#'
-#' Currently supported protocols:
-#' \itemize{
-#'   \item `"raw"`: return only the raw imported ABF object
-#'   \item `"C0"`: spectral protocol
-#'   \item `"C1"`: white-light protocol
-#' }
-#'
-#' @param x File path to a `.abf` file or a `zeus_abf_raw` object.
-#' @param protocol One of `"raw"`, `"C0"`, or `"C1"`.
-#' @param erg_channel ERG channel identifier.
-#' @param pc_channel Photocell channel identifier.
-#' @param repeats_per_stim Integer number of technical replicates per stimulus.
-#' @param expected_stim Integer number of stimulus conditions.
-#' @param exclude_noisy Logical.
-#' @param noise_threshold Numeric threshold for noisy-trace exclusion.
-#' @param zero_baseline Logical.
-#' @param baseline_window_ms Numeric length-2 vector in milliseconds.
-#' @param smooth_n Integer running-mean window size.
+#' @param path File path to an ABF file.
+#' @param protocol Protocol id. One of `"C0"` or `"C1"`.
+#' @param erg_channel Name of the ERG channel in the ABF file. Default is
+#'   `"ERG DAM80"`.
+#' @param pc_channel Name of the photocell channel in the ABF file. Default is
+#'   `"Photocell"`.
+#' @param zero_baseline Logical; apply baseline subtraction at the
+#'   technical-replicate level before averaging. Default is `FALSE`.
+#' @param smooth_n Integer running-mean window size applied to replicate-level
+#'   traces before any downstream processing. Default is `1L`.
 #' @param align_to_stimulus One of `"protocol"` or `"photocell"`.
-#' @param photocell_baseline_window_ms Numeric length-2 vector used for photocell baseline estimation.
-#' @param photocell_threshold_frac Fraction of photocell rise used for onset detection.
-#' @param ... Additional arguments passed only to `read_abf_raw()` when `x` is a file path.
+#' @param stimresp_zero_baseline Logical; apply baseline subtraction to
+#'   replicate-level traces before averaging into stimulus-response traces.
+#'   Default is `TRUE`.
+#' @param stimresp_baseline_window_ms Numeric length-2 vector for baseline
+#'   subtraction. Default is `c(300, 400)`.
+#' @param stimresp_exclude_noisy Logical; exclude noisy technical replicates
+#'   before averaging. Default is `TRUE`.
+#' @param stimresp_noise_window_ms Numeric length-2 vector for replicate-level
+#'   noise estimation. Default is `c(300, 1000)`.
+#' @param stimresp_noise_ratio_cutoff Numeric SD-ratio threshold used to remove
+#'   noisy technical replicates. Default is `1.5`.
+#' @param stimresp_runmean_k Integer running-average window size for averaged
+#'   stimulus-response traces. Use `1L` for none. Default is `16L`.
+#' @param stimresp_drift_correct Logical; stored in the output object for
+#'   downstream workflows. Default is `FALSE`.
+#' @param stimresp_drift_tail_n Integer number of final points used for
+#'   downstream drift estimation. Default is `100L`.
+#' @param stimresp_sg_smooth Logical; apply Savitzky-Golay smoothing to averaged
+#'   stimulus-response traces. Default is `TRUE`.
+#' @param stimresp_sg_n Integer Savitzky-Golay window size for averaged traces.
+#'   Default is `101L`.
+#' @param stimresp_sg_p Integer Savitzky-Golay polynomial order. Default is `2L`.
+#' @param ... Additional arguments passed to [read_abf_raw()].
 #'
-#' @return A `zeus_abf_raw` object if `protocol = "raw"`, otherwise a
-#'   `zeus_stimresp` object.
+#' @return An object of class `zeus_stimresp`.
 #' @export
-zeus_read_abf <- function(x,
-                          protocol = c("raw", "C0", "C1"),
+zeus_read_abf <- function(path,
+                          protocol = c("C0", "C1"),
                           erg_channel = "ERG DAM80",
                           pc_channel = "Photocell",
-                          repeats_per_stim = 4L,
-                          expected_stim = 70L,
-                          exclude_noisy = FALSE,
-                          noise_threshold = 1.5,
-                          zero_baseline = TRUE,
-                          baseline_window_ms = c(300, 400),
+                          zero_baseline = FALSE,
                           smooth_n = 1L,
                           align_to_stimulus = c("protocol", "photocell"),
-                          photocell_baseline_window_ms = c(0, 300),
-                          photocell_threshold_frac = 0.5,
+                          stimresp_zero_baseline = TRUE,
+                          stimresp_baseline_window_ms = c(300, 400),
+                          stimresp_exclude_noisy = TRUE,
+                          stimresp_noise_window_ms = c(300, 1000),
+                          stimresp_noise_ratio_cutoff = 1.5,
+                          stimresp_runmean_k = 16L,
+                          stimresp_drift_correct = FALSE,
+                          stimresp_drift_tail_n = 100L,
+                          stimresp_sg_smooth = TRUE,
+                          stimresp_sg_n = 101L,
+                          stimresp_sg_p = 2L,
                           ...) {
   protocol <- match.arg(protocol)
   align_to_stimulus <- match.arg(align_to_stimulus)
 
-  repeats_per_stim <- as.integer(repeats_per_stim)
-  expected_stim <- as.integer(expected_stim)
+  raw_obj <- read_abf_raw(path, ...)
+  raw_abf <- raw_obj$raw
+
+  abf_long <- abf_as_df_long(raw_abf)
+
+  erg_df <- abf_long |>
+    dplyr::filter(.data$channel == erg_channel)
+
+  if (nrow(erg_df) == 0L) {
+    stop("No ERG data found for channel: ", erg_channel, call. = FALSE)
+  }
+
+  pc_df <- abf_long |>
+    dplyr::filter(.data$channel == pc_channel)
+
+  if (isTRUE(zero_baseline)) {
+    erg_df <- zero_baseline_traces(
+      erg_df = erg_df,
+      baseline_window_ms = c(300, 400)
+    )
+  }
+
   smooth_n <- as.integer(smooth_n)
-
-  if (repeats_per_stim < 1L) {
-    stop("'repeats_per_stim' must be >= 1.", call. = FALSE)
-  }
-
-  if (expected_stim < 1L) {
-    stop("'expected_stim' must be >= 1.", call. = FALSE)
-  }
-
-  if (!is.logical(exclude_noisy) || length(exclude_noisy) != 1L || is.na(exclude_noisy)) {
-    stop("'exclude_noisy' must be TRUE or FALSE.", call. = FALSE)
-  }
-
-  if (!is.numeric(noise_threshold) || length(noise_threshold) != 1L || is.na(noise_threshold)) {
-    stop("'noise_threshold' must be a single numeric value.", call. = FALSE)
-  }
-
-  if (!is.logical(zero_baseline) || length(zero_baseline) != 1L || is.na(zero_baseline)) {
-    stop("'zero_baseline' must be TRUE or FALSE.", call. = FALSE)
-  }
-
-  if (!is.numeric(baseline_window_ms) || length(baseline_window_ms) != 2L) {
-    stop("'baseline_window_ms' must be a numeric vector of length 2.", call. = FALSE)
-  }
-
-  if (smooth_n < 1L) {
-    stop("'smooth_n' must be >= 1.", call. = FALSE)
-  }
-
-  if (!is.numeric(photocell_baseline_window_ms) || length(photocell_baseline_window_ms) != 2L) {
-    stop(
-      "'photocell_baseline_window_ms' must be a numeric vector of length 2.",
-      call. = FALSE
+  if (smooth_n > 1L) {
+    erg_df <- smooth_stimresp_traces(
+      erg_df = erg_df,
+      n = smooth_n
     )
   }
 
-  if (!is.numeric(photocell_threshold_frac) ||
-      length(photocell_threshold_frac) != 1L ||
-      is.na(photocell_threshold_frac) ||
-      photocell_threshold_frac <= 0) {
-    stop(
-      "'photocell_threshold_frac' must be a single positive numeric value.",
-      call. = FALSE
+  traces_280 <- label_stimulus_protocol(
+    erg_df = erg_df,
+    protocol = protocol
+  ) |>
+    dplyr::mutate(
+      time_ms = zeus_time_to_ms(.data$time)
     )
+
+  if (identical(align_to_stimulus, "photocell")) {
+    if (nrow(pc_df) == 0L) {
+      warning(
+        "Photocell alignment requested but no photocell channel was found. Falling back to protocol alignment.",
+        call. = FALSE
+      )
+    } else {
+      onset_df <- compute_photocell_onsets(pc_df)
+
+      traces_280 <- add_relative_time_cols(
+        df = traces_280,
+        onset_df = onset_df,
+        by = "sweep",
+        onset_col = "stim_onset_ms"
+      )
+    }
   }
 
-  raw_obj <- if (inherits(x, "zeus_abf_raw")) {
-    x
-  } else if (is.character(x) && length(x) == 1L) {
-    read_abf_raw(path = x, ...)
-  } else {
-    stop("'x' must be a file path or a 'zeus_abf_raw' object.", call. = FALSE)
-  }
+  stimresp_obj <- build_stimresp(
+    traces_280 = traces_280,
+    stimresp_zero_baseline = stimresp_zero_baseline,
+    stimresp_baseline_window_ms = stimresp_baseline_window_ms,
+    stimresp_exclude_noisy = stimresp_exclude_noisy,
+    stimresp_noise_window_ms = stimresp_noise_window_ms,
+    stimresp_noise_ratio_cutoff = stimresp_noise_ratio_cutoff,
+    stimresp_runmean_k = stimresp_runmean_k,
+    stimresp_sg_smooth = stimresp_sg_smooth,
+    stimresp_sg_n = stimresp_sg_n,
+    stimresp_sg_p = stimresp_sg_p
+  )
 
-  if (identical(protocol, "raw")) {
-    return(raw_obj)
-  }
+  traces_70 <- stimresp_obj$traces_70
+  stimresp_qc <- stimresp_obj$stimresp_qc
 
-  build_stimresp(
-    x = raw_obj,
+  out <- list(
+    raw = raw_abf,
+    path = raw_obj$path,
     protocol = protocol,
     erg_channel = erg_channel,
     pc_channel = pc_channel,
-    repeats_per_stim = repeats_per_stim,
-    expected_stim = expected_stim,
-    exclude_noisy = exclude_noisy,
-    noise_threshold = noise_threshold,
-    zero_baseline = zero_baseline,
-    baseline_window_ms = baseline_window_ms,
-    smooth_n = smooth_n,
     align_to_stimulus = align_to_stimulus,
-    photocell_baseline_window_ms = photocell_baseline_window_ms,
-    photocell_threshold_frac = photocell_threshold_frac
+    traces_280 = traces_280,
+    traces_70 = traces_70,
+    stimresp_qc = stimresp_qc,
+    stimresp_settings = list(
+      stimresp_zero_baseline = stimresp_zero_baseline,
+      stimresp_baseline_window_ms = stimresp_baseline_window_ms,
+      stimresp_exclude_noisy = stimresp_exclude_noisy,
+      stimresp_noise_window_ms = stimresp_noise_window_ms,
+      stimresp_noise_ratio_cutoff = stimresp_noise_ratio_cutoff,
+      stimresp_runmean_k = stimresp_runmean_k,
+      stimresp_drift_correct = stimresp_drift_correct,
+      stimresp_drift_tail_n = stimresp_drift_tail_n,
+      stimresp_sg_smooth = stimresp_sg_smooth,
+      stimresp_sg_n = stimresp_sg_n,
+      stimresp_sg_p = stimresp_sg_p
+    )
   )
+
+  class(out) <- c("zeus_stimresp", "zeus_abf", class(out))
+  out
 }
 
 # Convert to long DF ------------------------------------------------------
 
-#' Convert readABF output to a standardized long data frame
+#' Convert ABF output to a standardized long data frame
 #'
-#' @param raw_abf An object of class `.abf`.
+#' @param raw_abf An `ABF` object or a `zeus_abf_raw` object.
 #'
-#' @return A tibble in long format with columns:
-#'   `sweep`, `time`, `channel`, `units`, and `value`.
+#' @return A tibble in long format with columns `sweep`, `time`, `channel`,
+#'   `units`, and `value`.
 #' @keywords internal
 abf_as_df_long <- function(raw_abf) {
   if (inherits(raw_abf, "zeus_abf_raw")) {
@@ -220,14 +253,20 @@ abf_as_df_long <- function(raw_abf) {
 
 # Convert to wide DF ------------------------------------------------------
 
-#' Convert readABF output to a standardized wide data frame
+#' Convert ABF output to a standardized wide data frame
 #'
-#' @param raw_abf An object of class `ABF`.
+#' @param raw_abf An `ABF` object or a `zeus_abf_raw` object.
 #'
 #' @return A tibble in wide format with one row per time point per sweep.
 #' @keywords internal
 abf_as_df_wide <- function(raw_abf) {
-  stopifnot(inherits(raw_abf, "ABF"))
+  if (inherits(raw_abf, "zeus_abf_raw")) {
+    raw_abf <- raw_abf$raw
+  }
+
+  if (!inherits(raw_abf, "ABF")) {
+    stop("`raw_abf` must be an ABF object or a `zeus_abf_raw` object.", call. = FALSE)
+  }
 
   if (!requireNamespace("purrr", quietly = TRUE)) {
     stop("Package 'purrr' is required for this method.", call. = FALSE)
