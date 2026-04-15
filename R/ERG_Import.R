@@ -145,6 +145,14 @@ zeus_read_abf <- function(path,
       time_ms = zeus_time_to_ms(.data$time)
     )
 
+  # Drop sweeps that do not map to the protocol table (e.g., sweep 281 in a
+  # 280-sweep C0 recording) so that downstream averaging only operates on
+  # valid protocol-labeled data.
+  if ("stim_index" %in% names(traces_280)) {
+    traces_280 <- traces_280 |>
+      dplyr::filter(!is.na(.data$stim_index))
+  }
+
   if (identical(align_to_stimulus, "photocell")) {
     if (nrow(pc_df) == 0L) {
       warning(
@@ -188,6 +196,11 @@ zeus_read_abf <- function(path,
     align_to_stimulus = align_to_stimulus,
     traces_280 = traces_280,
     traces_70 = traces_70,
+    photocell = if (nrow(pc_df) > 0L) {
+      pc_df |> dplyr::mutate(time_ms = zeus_time_to_ms(.data$time))
+    } else {
+      NULL
+    },
     stimresp_qc = stimresp_qc,
     stimresp_settings = list(
       stimresp_zero_baseline = stimresp_zero_baseline,
@@ -251,45 +264,3 @@ abf_as_df_long <- function(raw_abf) {
   })
 }
 
-# Convert to wide DF ------------------------------------------------------
-
-#' Convert ABF output to a standardized wide data frame
-#'
-#' @param raw_abf An `ABF` object or a `zeus_abf_raw` object.
-#'
-#' @return A tibble in wide format with one row per time point per sweep.
-#' @keywords internal
-abf_as_df_wide <- function(raw_abf) {
-  if (inherits(raw_abf, "zeus_abf_raw")) {
-    raw_abf <- raw_abf$raw
-  }
-
-  if (!inherits(raw_abf, "ABF")) {
-    stop("`raw_abf` must be an ABF object or a `zeus_abf_raw` object.", call. = FALSE)
-  }
-
-  if (!requireNamespace("purrr", quietly = TRUE)) {
-    stop("Package 'purrr' is required for this method.", call. = FALSE)
-  }
-  if (!requireNamespace("tibble", quietly = TRUE)) {
-    stop("Package 'tibble' is required for this method.", call. = FALSE)
-  }
-
-  dt <- raw_abf$samplingIntervalInSec
-  ch_names <- raw_abf$channelNames
-
-  purrr::imap_dfr(raw_abf$data, function(m, s) {
-    npts <- nrow(m)
-    time <- (seq_len(npts) - 1) * dt
-
-    df <- tibble::as_tibble(m, .name_repair = "minimal")
-    names(df) <- ch_names
-
-    tibble::add_column(
-      df,
-      sweep = as.integer(s),
-      time = time,
-      .before = 1
-    )
-  })
-}
