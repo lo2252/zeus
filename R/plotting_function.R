@@ -561,7 +561,10 @@ zeus_plot_mean_waveform <- function(
           y = .data$signal,
           color = .data$color_group,
           alpha = .data$signal_type,
-          group = interaction(.data$color_group, .data$signal_type)
+          group = if ("stim_label" %in% names(df_by_stim))
+            interaction(.data$stim_label, .data$color_group, .data$signal_type)
+          else
+            interaction(.data$color_group, .data$signal_type)
         ),
         linewidth = 0.55,
         lineend = "round"
@@ -579,7 +582,10 @@ zeus_plot_mean_waveform <- function(
           x = .data$time_ms,
           y = .data$signal,
           color = .data$color_group,
-          group = .data$color_group
+          group = if ("stim_label" %in% names(df_by_stim))
+            interaction(.data$stim_label, .data$color_group)
+          else
+            .data$color_group
         ),
         linewidth = 0.60,
         alpha = 0.95,
@@ -841,112 +847,78 @@ zeus_plot_mean_waveform <- function(
 #' displaying A-wave trough amplitude, B-wave peak amplitude, and D-wave peak
 #' amplitude as a function of stimulus ND.
 #'
-#' The function is designed to operate directly on the output of
-#' \code{zeus_import()} or on a `zeus_stimresp` object, internally extracting
-#' waveform features using \code{zeus_extract_features()} before computing
-#' summary statistics.
+#' The function operates on a `zeus_stimresp` object returned by
+#' [zeus_read_abf()], extracting per-trace waveform measurements via
+#' [extract_irrad_wl_amp()] before computing summary statistics.
 #'
 #' The resulting plot shows mean response values for each wave type across
 #' stimulus ND levels, optionally grouped by a categorical variable such as
 #' treatment group. Standard error bars can also be included.
 #'
-#' @param df_long A data frame in ZEUS long format, or a `zeus_stimresp`
-#'   object. Must contain or resolve to columns \code{time}, \code{value},
-#'   \code{sweep}, and \code{stim_nd}.
-#' @param channel_filter Character string specifying the channel to
-#'   analyze (e.g., \code{"ERG DAM80"}). If \code{NULL}, all channels are used.
+#' @param x A `zeus_stimresp` object (output of [zeus_read_abf()]).
 #' @param group_col Optional character string specifying a grouping variable
-#'   (e.g., \code{"treatment_group"}). If provided, separate curves are plotted
-#'   for each group.
+#'   present in `x$traces_70` (e.g., \code{"treatment_group"}). If provided,
+#'   separate curves are plotted for each group.
 #' @param use_se Logical; if \code{TRUE}, standard error bars (mean ± SE) are
 #'   displayed. Default is \code{TRUE}.
 #' @param base_size Numeric base font size for the plot theme. Default is 11.
 #'
 #' @details
-#' The function performs the following steps:
-#' \enumerate{
-#'   \item Resolves waveform input to a standardized ZEUS long-format table.
-#'   \item Extracts A-wave, B-wave, and D-wave features using
-#'         \code{zeus_extract_features()}.
-#'   \item Reshapes the data into long format for plotting.
-#'   \item Computes summary statistics (mean and standard error) for each wave
-#'         across stimulus ND levels and optional grouping.
-#'   \item Generates a faceted plot with one panel per wave type.
-#' }
-#'
 #' The three panels correspond to:
 #' \itemize{
-#'   \item A-wave trough amplitude
-#'   \item B-wave peak amplitude
-#'   \item D-wave peak amplitude
+#'   \item A-wave trough amplitude (`awave_mv`)
+#'   \item B-wave peak amplitude (`amp_mv`)
+#'   \item D-wave peak amplitude (`dwave_mv`)
 #' }
 #'
 #' Stimulus ND is displayed on the x-axis in descending order so that larger ND
-#' values appear first.
+#' values (dimmer stimuli) appear first.
 #'
 #' @return A \code{ggplot2} object showing intensity-response curves for each
 #'   wave type.
 #'
 #' @export
 zeus_plot_intensity_response <- function(
-    df_long,
-    channel_filter = "ERG DAM80",
+    x,
     group_col = NULL,
     use_se = TRUE,
     base_size = 11
 ) {
-  prepared <- .zeus_prepare_plot_df(
-    x = df_long,
-    data_slot = "traces_280",
-    channel_filter = NULL,
-    require_cols = c("time", "value", "sweep", "stim_nd"),
-    allow_stimresp = TRUE
-  )
-
-  df_long <- prepared$df_plot
-
-  if (!is.null(group_col) && !group_col %in% names(df_long)) {
-    stop("`group_col` not found in df_long.", call. = FALSE)
+  if (!inherits(x, "zeus_stimresp")) {
+    stop("`x` must be a `zeus_stimresp` object returned by `zeus_read_abf()`.",
+         call. = FALSE)
   }
 
-  if (!is.null(channel_filter) && !"channel" %in% names(df_long)) {
-    stop("`channel_filter` supplied but no `channel` column found.", call. = FALSE)
+  # Extract per-trace waveform measurements using the current API
+  features_df <- extract_irrad_wl_amp(x)
+
+  if (!is.null(group_col) && !group_col %in% names(features_df)) {
+    stop("`group_col` '", group_col, "' not found in extracted features.", call. = FALSE)
   }
 
-  # Feature extraction
-  features_df <- zeus_extract_features(
-    df_long = df_long,
-    channel_filter = channel_filter
-  )
-
-  # Reshape
-  select_cols <- c(
-    "stim_nd",
-    "a_wave_trough_uv",
-    "b_wave_peak_uv",
-    "d_wave_peak_uv"
-  )
+  # Reshape: A-wave = awave_mv, B-wave = amp_mv, D-wave = dwave_mv
+  select_cols <- c("stim_nd", "awave_mv", "amp_mv", "dwave_mv")
 
   if (!is.null(group_col)) {
     select_cols <- c(select_cols, group_col)
   }
 
   df_plot <- features_df |>
-    dplyr::select(dplyr::all_of(select_cols)) |>
+    dplyr::select(dplyr::any_of(select_cols)) |>
     tidyr::pivot_longer(
-      cols = c("a_wave_trough_uv", "b_wave_peak_uv", "d_wave_peak_uv"),
+      cols = dplyr::any_of(c("awave_mv", "amp_mv", "dwave_mv")),
       names_to = "wave",
       values_to = "response"
     ) |>
     dplyr::mutate(
-      wave = dplyr::recode(
-        wave,
-        "a_wave_trough_uv" = "A-wave",
-        "b_wave_peak_uv" = "B-wave",
-        "d_wave_peak_uv" = "D-wave"
+      wave = dplyr::case_match(
+        .data$wave,
+        "awave_mv" ~ "A-wave",
+        "amp_mv"   ~ "B-wave",
+        "dwave_mv" ~ "D-wave"
       )
     ) |>
-    dplyr::filter(!is.na(response), !is.na(stim_nd))
+    dplyr::filter(!is.na(.data$response), !is.na(.data$stim_nd))
 
   # Summary stats
   group_vars <- c("stim_nd", "wave")
@@ -956,29 +928,26 @@ zeus_plot_intensity_response <- function(
     dplyr::group_by(dplyr::across(dplyr::all_of(group_vars))) |>
     dplyr::summarise(
       n = dplyr::n(),
-      mean = mean(response, na.rm = TRUE),
-      se = stats::sd(response, na.rm = TRUE) / sqrt(n),
+      mean = mean(.data$response, na.rm = TRUE),
+      se = stats::sd(.data$response, na.rm = TRUE) / sqrt(.data$n),
       .groups = "drop"
     )
 
   # Plot
   p <- ggplot2::ggplot(
     df_summary,
-    ggplot2::aes(
-      x = stim_nd,
-      y = mean
-    )
+    ggplot2::aes(x = .data$stim_nd, y = .data$mean)
   )
 
   if (!is.null(group_col)) {
     p <- p +
       ggplot2::aes(
         color = .data[[group_col]],
-        group = interaction(.data[[group_col]], wave)
+        group = interaction(.data[[group_col]], .data$wave)
       )
   } else {
     p <- p +
-      ggplot2::aes(group = wave)
+      ggplot2::aes(group = .data$wave)
   }
 
   p <- p +
@@ -989,8 +958,8 @@ zeus_plot_intensity_response <- function(
     p <- p +
       ggplot2::geom_errorbar(
         ggplot2::aes(
-          ymin = mean - se,
-          ymax = mean + se
+          ymin = .data$mean - .data$se,
+          ymax = .data$mean + .data$se
         ),
         width = 0.1,
         linewidth = 0.4
