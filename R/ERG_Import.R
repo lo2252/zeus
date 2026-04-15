@@ -145,6 +145,14 @@ zeus_read_abf <- function(path,
       time_ms = zeus_time_to_ms(.data$time)
     )
 
+  # Drop sweeps that do not map to the protocol table (e.g., sweep 281 in a
+  # 280-sweep C0 recording) so that downstream averaging only operates on
+  # valid protocol-labeled data.
+  if ("stim_index" %in% names(traces_280)) {
+    traces_280 <- traces_280 |>
+      dplyr::filter(!is.na(.data$stim_index))
+  }
+
   if (identical(align_to_stimulus, "photocell")) {
     if (nrow(pc_df) == 0L) {
       warning(
