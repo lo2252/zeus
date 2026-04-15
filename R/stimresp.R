@@ -709,8 +709,25 @@ average_stimresp_reps <- function(df,
     df
   }
 
+  # Preserve protocol metadata columns that are constant within each
+  # stim_index (e.g., wavelength, stim_nd). Including them in group_by
+  # does not change the averaging logic but retains them in the output,
+  # which is critical for spectral protocols like C0.
+  meta_cols <- intersect(
+    c("protocol_id", "protocol_variant", "stim_type",
+      "block_index", "within_block_index", "wavelength", "stim_nd"),
+    names(df_use)
+  )
+
+  # Also preserve the original time column if present (time_ms is always
+  # grouped on; time in seconds has a 1:1 mapping and is needed by
+  # downstream post-processing and plotting).
+  time_cols <- intersect(c("time", "time_ms"), names(df_use))
+
+  group_cols <- unique(c("stim_index", "stim_label", meta_cols, time_cols))
+
   avg <- df_use |>
-    dplyr::group_by(.data$stim_index, .data$stim_label, .data$time_ms) |>
+    dplyr::group_by(dplyr::across(dplyr::all_of(group_cols))) |>
     dplyr::summarise(
       value = mean(.data$value, na.rm = TRUE),
       n_reps_used = dplyr::n_distinct(.data$sweep),
