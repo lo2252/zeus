@@ -225,10 +225,20 @@ if (!"value_raw" %in% names(traces_70)) {
   cat("  NOTE: value_raw not found in traces_70 - using smoothed value instead.\n")
 }
 
+# Aggregate by stim_label: Origin averages 10 columns with the same ND label
+# (one per wavelength group in C0) into a single trace. ZEUS traces_70 keeps
+# one row per stim_index (70 total), so for C1's 7 unique ND labels there are
+# 10 ZEUS rows each. Collapsing here ensures a 1:1 match with Origin's output.
 zeus_processed <- traces_70 |>
   dplyr::select("stim_label", "time_ms",
                 zeus_raw = "value_raw",
-                zeus_smoothed = "value")
+                zeus_smoothed = "value") |>
+  dplyr::group_by(.data$stim_label, .data$time_ms) |>
+  dplyr::summarise(
+    zeus_raw      = mean(.data$zeus_raw,      na.rm = TRUE),
+    zeus_smoothed = mean(.data$zeus_smoothed, na.rm = TRUE),
+    .groups = "drop"
+  )
 
 wave_compare <- zeus_processed |>
   dplyr::inner_join(origin_long, by = c("stim_label", "time_ms")) |>
@@ -240,6 +250,10 @@ wave_compare <- zeus_processed |>
   )
 
 cat(sprintf("  Matched trace rows: %d\n", nrow(wave_compare)))
+cat(sprintf("  Unique labels matched: %d / %d ZEUS, %d Origin\n",
+            dplyr::n_distinct(wave_compare$stim_label),
+            dplyr::n_distinct(zeus_processed$stim_label),
+            dplyr::n_distinct(origin_long$stim_label)))
 
 if (nrow(wave_compare) == 0L) {
   cat("  WARNING: No rows matched.\n")
