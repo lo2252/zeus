@@ -196,6 +196,11 @@ zeus_read_abf <- function(path,
     align_to_stimulus = align_to_stimulus,
     traces_280 = traces_280,
     traces_70 = traces_70,
+    photocell = if (nrow(pc_df) > 0L) {
+      pc_df |> dplyr::mutate(time_ms = zeus_time_to_ms(.data$time))
+    } else {
+      NULL
+    },
     stimresp_qc = stimresp_qc,
     stimresp_settings = list(
       stimresp_zero_baseline = stimresp_zero_baseline,

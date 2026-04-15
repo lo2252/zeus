@@ -74,7 +74,10 @@ build_stimresp <- function(traces_280,
     noise_ratio_cutoff = stimresp_noise_ratio_cutoff
   )
 
-  traces_70 <- avg_obj$avg
+  # Preserve the unsmoothed average as value_raw before any post-processing
+  # so that compare_raw = TRUE in zeus_plot_mean_waveform has a value to show.
+  traces_70 <- avg_obj$avg |>
+    dplyr::mutate(value_raw = .data$value)
 
   if (isTRUE(stimresp_sg_smooth) || as.integer(stimresp_runmean_k) > 1L) {
     traces_70 <- traces_70 |>

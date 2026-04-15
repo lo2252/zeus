@@ -429,11 +429,20 @@ zeus_plot_mean_waveform <- function(
   names(plot_colors) <- stim_levels_chr
 
   # Aggregate plotted data
-  group_cols <- c("time_ms", "color_group")
-  optional_cols <- intersect(c("stim_label", "stim_nd", "wavelength"), names(df_plot))
+  # Only include metadata cols that are at the SAME level as color_by to
+  # avoid creating spurious fine-grained sub-groups (e.g. when color_by =
+  # "stim_nd", including stim_label in the grouping would create 70 separate
+  # lines for C0 instead of one averaged line per ND level).
+  extra_meta_cols <- switch(
+    color_by,
+    stim_label = intersect(c("stim_nd", "wavelength"), names(df_plot)),
+    stim_nd    = intersect(c("stim_nd"),                names(df_plot)),
+    wavelength = intersect(c("wavelength"),              names(df_plot)),
+    character(0)
+  )
 
   df_by_stim <- df_plot |>
-    dplyr::group_by(dplyr::across(dplyr::all_of(c(group_cols, optional_cols)))) |>
+    dplyr::group_by(dplyr::across(dplyr::all_of(c("time_ms", "color_group", extra_meta_cols)))) |>
     dplyr::summarise(
       Smoothed = mean(.data$value, na.rm = TRUE),
       Raw = if (isTRUE(compare_raw)) mean(.data$value_raw, na.rm = TRUE) else NA_real_,
@@ -561,10 +570,7 @@ zeus_plot_mean_waveform <- function(
           y = .data$signal,
           color = .data$color_group,
           alpha = .data$signal_type,
-          group = if ("stim_label" %in% names(df_by_stim))
-            interaction(.data$stim_label, .data$color_group, .data$signal_type)
-          else
-            interaction(.data$color_group, .data$signal_type)
+          group = interaction(.data$color_group, .data$signal_type)
         ),
         linewidth = 0.55,
         lineend = "round"
@@ -582,10 +588,7 @@ zeus_plot_mean_waveform <- function(
           x = .data$time_ms,
           y = .data$signal,
           color = .data$color_group,
-          group = if ("stim_label" %in% names(df_by_stim))
-            interaction(.data$stim_label, .data$color_group)
-          else
-            .data$color_group
+          group = .data$color_group
         ),
         linewidth = 0.60,
         alpha = 0.95,
@@ -929,7 +932,7 @@ zeus_plot_intensity_response <- function(
     dplyr::summarise(
       n = dplyr::n(),
       mean = mean(.data$response, na.rm = TRUE),
-      se = stats::sd(.data$response, na.rm = TRUE) / sqrt(.data$n),
+      se = stats::sd(.data$response, na.rm = TRUE) / sqrt(n),
       .groups = "drop"
     )
 
