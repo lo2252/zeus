@@ -184,6 +184,15 @@ if (nrow(sweep_mismatches) > 0L) {
 
 # ------------------------------------------------------------------------------
 # 7. Mean trace comparison: ZEUS vs Origin
+#
+# Origin StimResp contains BASELINE-CORRECTED, AVERAGED traces.
+# The correct ZEUS counterpart is traces_70:
+#   - value_raw : baseline-corrected, averaged across reps (no smoothing) — best
+#                 for a direct numerical comparison to Origin StimResp.
+#   - value     : same but additionally Savitzky-Golay smoothed — shown as a
+#                 secondary comparison to quantify the smoothing effect.
+# For C1, Origin exports one column per unique ND level (duplicates averaged by
+# Origin). We average duplicate stim_label columns in origin_long accordingly.
 # ------------------------------------------------------------------------------
 
 cat("\n-- Mean trace comparison --\n")
@@ -208,53 +217,66 @@ origin_long <- raw_sheet |>
     .groups = "drop"
   )
 
-zeus_mean <- traces_280 |>
-  dplyr::filter(.data$channel == erg_channel) |>
-  dplyr::group_by(.data$stim_label, .data$time_ms) |>
-  dplyr::summarise(zeus_value = mean(.data$value, na.rm = TRUE), .groups = "drop")
+# ZEUS processed traces (baseline-corrected, averaged, pre-smoothing)
+traces_70 <- zeus_obj$traces_70
 
-wave_compare <- zeus_mean |>
+if (!"value_raw" %in% names(traces_70)) {
+  traces_70 <- traces_70 |> dplyr::mutate(value_raw = .data$value)
+  cat("  NOTE: value_raw not found in traces_70 - using smoothed value instead.\n")
+}
+
+zeus_processed <- traces_70 |>
+  dplyr::select("stim_label", "time_ms",
+                zeus_raw = "value_raw",
+                zeus_smoothed = "value")
+
+wave_compare <- zeus_processed |>
   dplyr::inner_join(origin_long, by = c("stim_label", "time_ms")) |>
   dplyr::mutate(
-    diff      = .data$zeus_value - .data$origin_value,
-    abs_diff  = abs(.data$diff),
-    sq_diff   = .data$diff^2
+    diff_raw          = .data$zeus_raw - .data$origin_value,
+    abs_diff_raw      = abs(.data$diff_raw),
+    diff_smoothed     = .data$zeus_smoothed - .data$origin_value,
+    abs_diff_smoothed = abs(.data$diff_smoothed)
   )
 
 cat(sprintf("  Matched trace rows: %d\n", nrow(wave_compare)))
 
 if (nrow(wave_compare) == 0L) {
-  cat("  WARNING: No rows matched. Check time alignment or label format.\n")
+  cat("  WARNING: No rows matched.\n")
+  cat("  Possible causes:\n")
+  cat("    - time_ms mismatch: check that Origin time column is in milliseconds\n")
+  cat("    - stim_label mismatch: run protocol comparison above to verify\n")
 } else {
-  overall <- wave_compare |>
-    dplyr::summarise(
-      n_points     = dplyr::n(),
-      mean_diff    = mean(.data$diff,      na.rm = TRUE),
-      mean_abs_diff = mean(.data$abs_diff, na.rm = TRUE),
-      rmse         = sqrt(mean(.data$sq_diff, na.rm = TRUE)),
-      max_abs_diff = max(.data$abs_diff,   na.rm = TRUE),
-      correlation  = suppressWarnings(
-        cor(.data$zeus_value, .data$origin_value, use = "complete.obs")
-      )
-    )
+  summarise_agreement <- function(df, val_col, ref_col, label) {
+    diff_col <- df[[val_col]] - df[[ref_col]]
+    cat(sprintf(
+      "\n  %s vs Origin:\n    n=%d  mean_diff=%.3f  mean|diff|=%.3f  RMSE=%.3f  max|diff|=%.3f  r=%.6f\n",
+      label, nrow(df),
+      mean(diff_col, na.rm = TRUE),
+      mean(abs(diff_col), na.rm = TRUE),
+      sqrt(mean(diff_col^2, na.rm = TRUE)),
+      max(abs(diff_col), na.rm = TRUE),
+      suppressWarnings(cor(df[[val_col]], df[[ref_col]], use = "complete.obs"))
+    ))
+  }
 
-  cat("\n  Overall trace agreement:\n")
-  print(overall)
+  summarise_agreement(wave_compare, "zeus_raw",      "origin_value", "ZEUS unsmoothed (value_raw)")
+  summarise_agreement(wave_compare, "zeus_smoothed", "origin_value", "ZEUS smoothed   (value)    ")
 
   by_label <- wave_compare |>
     dplyr::group_by(.data$stim_label) |>
     dplyr::summarise(
       n             = dplyr::n(),
-      mean_abs_diff = mean(.data$abs_diff, na.rm = TRUE),
-      rmse          = sqrt(mean(.data$sq_diff, na.rm = TRUE)),
+      mean_abs_diff = mean(.data$abs_diff_raw, na.rm = TRUE),
+      rmse          = sqrt(mean(.data$diff_raw^2, na.rm = TRUE)),
       correlation   = suppressWarnings(
-        cor(.data$zeus_value, .data$origin_value, use = "complete.obs")
+        cor(.data$zeus_raw, .data$origin_value, use = "complete.obs")
       ),
       .groups = "drop"
     ) |>
     dplyr::arrange(dplyr::desc(.data$mean_abs_diff))
 
-  cat("\n  Per-label trace agreement (worst first, top 10):\n")
+  cat("\n  Per-label agreement (unsmoothed, worst first, top 10):\n")
   print(head(by_label, 10L))
 }
 
@@ -266,20 +288,20 @@ cat("\n== C1 Validation Summary ==\n")
 cat(sprintf("  Protocol labels match:  %d / 70\n",  n_match))
 cat(sprintf("  Sweep labels match:     %d / 280\n", n_sweep_match))
 if (nrow(wave_compare) > 0L) {
+  diff_raw <- wave_compare$zeus_raw - wave_compare$origin_value
   cat(sprintf(
-    "  Trace correlation:      %.6f\n",
-    suppressWarnings(cor(wave_compare$zeus_value, wave_compare$origin_value,
+    "  Trace correlation (unsmoothed): %.6f\n",
+    suppressWarnings(cor(wave_compare$zeus_raw, wave_compare$origin_value,
                          use = "complete.obs"))
   ))
-  cat(sprintf(
-    "  Mean |diff| (uV):       %.4f\n",
-    mean(wave_compare$abs_diff, na.rm = TRUE)
-  ))
+  cat(sprintf("  Mean |diff| (uV):               %.4f\n", mean(abs(diff_raw), na.rm = TRUE)))
 }
 
 results_c1 <- list(
   protocol_compare = protocol_compare,
   sweep_compare    = sweep_compare,
+  origin_long      = origin_long,
+  traces_70        = traces_70,
   wave_compare     = wave_compare
 )
 
