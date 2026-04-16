@@ -1106,7 +1106,7 @@ zeus_plot_intensity_response <- function(
 #' ggplot2 >= 3.4.0). Each panel's strip label is composed of two lines:
 #' \enumerate{
 #'   \item The wavelength prefix (C0) or block number (C1).
-#'   \item A metadata tag of the form `"Block N · C0/C1 · filename"`.
+#'   \item A metadata tag of the form `"Block N | C0/C1 | filename"`.
 #' }
 #' When `x` is a `zeus_stimresp` object the protocol and filename are
 #' auto-detected; they can also be supplied explicitly via `protocol_label`
@@ -1190,7 +1190,7 @@ zeus_plot_spectral_waveform <- function(
   }
 
   # Internal helper: build the second line of the strip label for a single
-  # block.  Returns a string of the form "Block N · C0 · filename", omitting
+  # block.  Returns a string of the form "Block N | C0 | filename", omitting
   # any component that is NA / NULL.
   .make_block_sublabel <- function(block_idx, proto, fname) {
     parts <- character(0)
@@ -1199,12 +1199,12 @@ zeus_plot_spectral_waveform <- function(
     }
     if (!is.null(proto) && nzchar(proto)) parts <- c(parts, proto)
     if (!is.null(fname)  && nzchar(fname))  parts <- c(parts, fname)
-    paste(parts, collapse = " \u00b7 ")  # Unicode middle dot separator
+    paste(parts, collapse = " | ")  # ASCII separator: "Block N | C0 | filename"
   }
 
-  # Derive a per-block label from the wavelength prefix of stim_label.
-  # For C0:  "650A 4.0" -> "650A", "570 5.0" -> "570", etc.
-  # For C1:  "White 6.0" -> "White" (all same; fall back to block_index).
+  # Extract the wavelength prefix: first non-whitespace token of stim_label.
+  # Expected formats: "650A 4.0" -> "650A", "570 5.0" -> "570",
+  #                   "White 6.0" -> "White".
   df_plot <- df_plot |>
     dplyr::mutate(
       .wl_prefix = stringr::str_extract(.data$stim_label, "^\\S+")
@@ -1219,7 +1219,7 @@ zeus_plot_spectral_waveform <- function(
         dplyr::distinct(.data$.wl_prefix, .data$block_index) |>
         dplyr::arrange(.data$block_index)
 
-      # Build compound label: line 1 = wavelength; line 2 = Block N · proto · file
+      # Build compound label: line 1 = wavelength; line 2 = Block N | proto | file
       compound_labels <- vapply(
         seq_len(nrow(prefix_block_map)),
         function(i) {
@@ -1266,7 +1266,7 @@ zeus_plot_spectral_waveform <- function(
     }
     block_order <- sort(unique(df_plot$block_index))
 
-    # Build label per block: "Block N · C1 · filename"
+    # Build label per block: "Block N | C1 | filename"
     block_label_vec <- vapply(
       block_order,
       function(b) .make_block_sublabel(b, protocol_label, file_label),
@@ -1346,8 +1346,8 @@ zeus_plot_spectral_waveform <- function(
     ggplot2::facet_wrap(~block_label, ncol = facet_ncol, axes = "all_x"),
     error = function(e) {
       message(
-        "zeus_plot_spectral_waveform: `axes = 'all_x'` requires ggplot2 >= 3.4.0. ",
-        "Falling back to default axis placement (x-axis on bottom row only)."
+        "zeus_plot_spectral_waveform: `axes = 'all_x'` requires ggplot2 >= 3.4.0; ",
+        "falling back to x-axis on bottom row only."
       )
       ggplot2::facet_wrap(~block_label, ncol = facet_ncol)
     }
