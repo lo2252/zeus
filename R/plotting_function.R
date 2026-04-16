@@ -290,7 +290,7 @@
 #' trace so that it appears below the ERG waveform — matching the display
 #' convention used in Origin StimResp outputs.
 #'
-#' The photocell is normalized to [0, 1], scaled to occupy
+#' The photocell is normalized to \code{[0, 1]}, scaled to occupy
 #' `photocell_relative_height * erg_range` in Y units, and shifted so its
 #' baseline sits just below `erg_ymin`.
 #'
