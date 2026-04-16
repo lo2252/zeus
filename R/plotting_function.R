@@ -281,6 +281,106 @@
   )
 }
 
+
+# Photocell scaling helper ------------------------------------------------
+
+#' Scale and position a photocell trace for Origin-like display
+#'
+#' Internal helper used by ZEUS plotting functions to normalize a raw photocell
+#' trace so that it appears below the ERG waveform — matching the display
+#' convention used in Origin StimResp outputs.
+#'
+#' The photocell is normalized to [0, 1], scaled to occupy
+#' `photocell_relative_height * erg_range` in Y units, and shifted so its
+#' baseline sits just below `erg_ymin`.
+#'
+#' @param df_photocell_source A data frame containing photocell data, expected
+#'   to have `time_ms` and `signal` columns.
+#' @param photocell_filter Pattern passed to [grepl()] to identify the
+#'   photocell channel when a `channel` column is present.
+#' @param erg_ymin Numeric. Minimum Y value of the ERG signal (used for
+#'   positioning).
+#' @param erg_range Numeric. Total Y range of the ERG signal (used for
+#'   scaling).
+#' @param photocell_relative_height Fraction of `erg_range` that the photocell
+#'   pulse should occupy. Default is `0.20`.
+#'
+#' @return A data frame with `time_ms` and `signal` columns ready to overlay
+#'   on a plot, or `NULL` if no valid photocell data could be prepared.
+#' @keywords internal
+.zeus_scale_photocell <- function(
+    df_photocell_source,
+    photocell_filter = "Photocell",
+    erg_ymin,
+    erg_range,
+    photocell_relative_height = 0.20
+) {
+  if (is.null(df_photocell_source) || !is.data.frame(df_photocell_source)) {
+    return(NULL)
+  }
+
+  pc <- df_photocell_source
+
+  # Ensure time column
+  if (!("time" %in% names(pc))) {
+    if ("time_ms" %in% names(pc)) {
+      pc <- pc |> dplyr::mutate(time = .data$time_ms / 1000)
+    } else {
+      return(NULL)
+    }
+  }
+
+  # Ensure value column
+  if (!("value" %in% names(pc))) {
+    if ("signal" %in% names(pc)) {
+      pc <- pc |> dplyr::rename(value = .data$signal)
+    } else if ("mean_value" %in% names(pc)) {
+      pc <- pc |> dplyr::rename(value = .data$mean_value)
+    } else {
+      return(NULL)
+    }
+  }
+
+  # Ensure time_ms column
+  if (!("time_ms" %in% names(pc))) {
+    pc <- pc |> dplyr::mutate(time_ms = zeus_time_to_ms(.data$time))
+  }
+
+  # Filter to photocell channel when channel column is present
+  if ("channel" %in% names(pc)) {
+    pc <- pc |> dplyr::filter(grepl(photocell_filter, .data$channel, fixed = TRUE))
+  }
+
+  if (nrow(pc) == 0) return(NULL)
+
+  # Average all sweeps to a single representative photocell trace
+  pc <- pc |>
+    dplyr::group_by(.data$time_ms) |>
+    dplyr::summarise(signal = mean(.data$value, na.rm = TRUE), .groups = "drop")
+
+  if (nrow(pc) == 0) return(NULL)
+
+  pc_min <- min(pc$signal, na.rm = TRUE)
+  pc_max <- max(pc$signal, na.rm = TRUE)
+  pc_range <- pc_max - pc_min
+
+  if (!is.finite(erg_range) || erg_range <= 0 ||
+      !is.finite(pc_range) || pc_range <= 0) {
+    return(NULL)
+  }
+
+  # Target: photocell occupies photocell_relative_height * erg_range in Y.
+  # Baseline is positioned slightly below erg_ymin (5 % gap).
+  target_height <- photocell_relative_height * erg_range
+  pc_baseline   <- erg_ymin - 0.05 * erg_range
+
+  pc |>
+    dplyr::mutate(
+      signal = ((signal - pc_min) / pc_range) * target_height + pc_baseline
+    )
+}
+
+
 # Mean ERG waveform plot across sweeps ------------------------------------
 
 #' Plot mean ERG waveforms from ZEUS StimResp output
@@ -324,11 +424,15 @@
 #'   when available.
 #' @param photocell_filter Character string used to identify the photocell
 #'   channel when plotting from a data frame or from `traces_280`.
-#' @param photocell_color Color for the photocell trace.
-#' @param photocell_auto_scale Logical; if `TRUE`, rescales the photocell trace
-#'   relative to the ERG signal.
-#' @param photocell_relative_height Relative height multiplier used when
-#'   `photocell_auto_scale = TRUE`.
+#' @param photocell_color Color for the photocell trace. Default `"black"`.
+#' @param photocell_auto_scale Logical; if `TRUE` (default), rescales and
+#'   positions the photocell trace below the ERG signal following the Origin
+#'   StimResp convention: the pulse height equals
+#'   `photocell_relative_height * ERG_range` and the baseline sits slightly
+#'   below the minimum ERG value.
+#' @param photocell_relative_height Fraction of the ERG amplitude range that
+#'   the photocell pulse should occupy when `photocell_auto_scale = TRUE`.
+#'   Default is `0.20` (20% of the ERG range).
 #' @param a_window Numeric length-2 vector giving the A-wave search interval in
 #'   milliseconds.
 #' @param b_window Numeric length-2 vector giving the B-wave search interval in
@@ -337,7 +441,11 @@
 #'   milliseconds.
 #' @param stim_levels Optional vector giving the desired order of stimulus labels
 #'   in the legend. If `NULL`, uses the order present in the data.
-#' @param color_by One of `"stim_label"`, `"stim_nd"`, or `"wavelength"`.
+#' @param color_by One of `"stim_nd"`, `"stim_label"`, or `"wavelength"`.
+#'   Defaults to `"stim_nd"` so that traces with the same neutral-density level
+#'   are averaged together regardless of wavelength — matching the Origin
+#'   StimResp grouping for spectral (C0) protocols.  Use `"stim_label"` to keep
+#'   each wavelength × ND combination as a separate trace.
 #' @param overall_color Color for the overall mean line.
 #' @param marker_color Color for marker reference lines.
 #' @param base_size Base font size for the plot theme.
@@ -355,12 +463,12 @@ zeus_plot_mean_waveform <- function(
     photocell_filter = "Photocell",
     photocell_color = "black",
     photocell_auto_scale = TRUE,
-    photocell_relative_height = 1.0,
+    photocell_relative_height = 0.20,
     a_window = c(400, 700),
     b_window = c(400, 700),
     d_window = c(700, 1000),
     stim_levels = NULL,
-    color_by = c("stim_label", "stim_nd", "wavelength"),
+    color_by = c("stim_nd", "stim_label", "wavelength"),
     overall_color = "red",
     marker_color = "black",
     base_size = 12
@@ -420,12 +528,13 @@ zeus_plot_mean_waveform <- function(
       color_group = factor(.data$color_group, levels = stim_levels_chr)
     )
 
-  # Color palette
-  base_palette <- c(
-    "#332288", "#88CCEE", "#44AA99", "#117733",
-    "#999933", "#DDCC77", "#CC6677", "#882255", "#AA4499"
+  # Publication-quality sequential palette:
+  # highest ND (dimmest stimulus) → lightest blue;
+  # lowest  ND (brightest stimulus) → darkest navy.
+  nd_palette_fn <- grDevices::colorRampPalette(
+    c("#C6DBEF", "#9ECAE1", "#6BAED6", "#3182BD", "#08519C", "#08306B")
   )
-  plot_colors <- rep(base_palette, length.out = length(stim_levels_chr))
+  plot_colors <- nd_palette_fn(length(stim_levels_chr))
   names(plot_colors) <- stim_levels_chr
 
   # Aggregate plotted data
@@ -495,64 +604,39 @@ zeus_plot_mean_waveform <- function(
       )
   }
 
-  # Photocell
+  # Photocell — Origin-like: scaled to fraction of ERG range, positioned below
   df_photocell <- NULL
 
   if (isTRUE(include_photocell) && !is.null(df_photocell_source)) {
-    if (is.data.frame(df_photocell_source)) {
-      if (!("time" %in% names(df_photocell_source))) {
-        if ("time_ms" %in% names(df_photocell_source)) {
-          df_photocell_source <- df_photocell_source |>
-            dplyr::mutate(time = .data$time_ms / 1000)
-        }
+    erg_ymin  <- min(df_by_stim$signal, na.rm = TRUE)
+    erg_ymax  <- max(df_by_stim$signal, na.rm = TRUE)
+    erg_range <- erg_ymax - erg_ymin
+
+    if (isTRUE(photocell_auto_scale)) {
+      df_photocell <- .zeus_scale_photocell(
+        df_photocell_source      = df_photocell_source,
+        photocell_filter         = photocell_filter,
+        erg_ymin                 = erg_ymin,
+        erg_range                = erg_range,
+        photocell_relative_height = photocell_relative_height
+      )
+    } else {
+      # Manual path: still extract and average, but do not rescale.
+      pc <- df_photocell_source
+      if (!("time_ms" %in% names(pc)) && "time" %in% names(pc)) {
+        pc <- pc |> dplyr::mutate(time_ms = zeus_time_to_ms(.data$time))
       }
-
-      if (!("value" %in% names(df_photocell_source))) {
-        if ("signal" %in% names(df_photocell_source)) {
-          df_photocell_source <- df_photocell_source |>
-            dplyr::rename(value = .data$signal)
-        } else if ("mean_value" %in% names(df_photocell_source)) {
-          df_photocell_source <- df_photocell_source |>
-            dplyr::rename(value = .data$mean_value)
-        }
+      if (!("value" %in% names(pc)) && "signal" %in% names(pc)) {
+        pc <- pc |> dplyr::rename(value = .data$signal)
       }
-
-      if (!("time_ms" %in% names(df_photocell_source)) && "time" %in% names(df_photocell_source)) {
-        df_photocell_source <- df_photocell_source |>
-          dplyr::mutate(time_ms = zeus_time_to_ms(.data$time))
-      }
-
-      if (all(c("time", "value") %in% names(df_photocell_source))) {
-        if ("channel" %in% names(df_photocell_source)) {
-          df_photocell <- df_photocell_source |>
-            dplyr::filter(grepl(photocell_filter, .data$channel))
-        } else {
-          df_photocell <- df_photocell_source
+      if (all(c("time_ms", "value") %in% names(pc))) {
+        if ("channel" %in% names(pc)) {
+          pc <- pc |> dplyr::filter(grepl(photocell_filter, .data$channel, fixed = TRUE))
         }
-
-        if (nrow(df_photocell) > 0) {
-          df_photocell <- df_photocell |>
+        if (nrow(pc) > 0) {
+          df_photocell <- pc |>
             dplyr::group_by(.data$time_ms) |>
-            dplyr::summarise(
-              signal = mean(.data$value, na.rm = TRUE),
-              .groups = "drop"
-            )
-
-          if (isTRUE(photocell_auto_scale)) {
-            erg_peak <- max(abs(df_by_stim$signal), na.rm = TRUE)
-            photocell_peak <- max(abs(df_photocell$signal), na.rm = TRUE)
-
-            if (is.finite(erg_peak) && is.finite(photocell_peak) && photocell_peak > 0) {
-              scale_factor <- (erg_peak * photocell_relative_height) / photocell_peak
-            } else {
-              scale_factor <- 1
-            }
-
-            df_photocell <- df_photocell |>
-              dplyr::mutate(signal = .data$signal * scale_factor)
-          }
-        } else {
-          df_photocell <- NULL
+            dplyr::summarise(signal = mean(.data$value, na.rm = TRUE), .groups = "drop")
         }
       }
     }
@@ -825,18 +909,23 @@ zeus_plot_mean_waveform <- function(
       plot.title = ggplot2::element_text(
         face = "bold",
         hjust = 0.5,
+        size = ggplot2::rel(1.1),
         margin = ggplot2::margin(b = 10)
       ),
       axis.title = ggplot2::element_text(face = "bold"),
-      axis.text = ggplot2::element_text(color = "black"),
-      legend.title = ggplot2::element_text(face = "bold"),
-      legend.position = "right",
-      legend.box = "vertical",
-      legend.spacing.y = grid::unit(0.25, "cm"),
-      legend.key.width = grid::unit(0.9, "cm"),
-      panel.border = ggplot2::element_blank(),
-      axis.line = ggplot2::element_line(linewidth = 0.6),
-      axis.ticks = ggplot2::element_line(linewidth = 0.5)
+      axis.text  = ggplot2::element_text(color = "black"),
+      legend.title      = ggplot2::element_text(face = "bold"),
+      legend.text       = ggplot2::element_text(size = ggplot2::rel(0.85)),
+      legend.position   = "right",
+      legend.box        = "vertical",
+      legend.spacing.y  = grid::unit(0.2, "cm"),
+      legend.key.width  = grid::unit(1.0, "cm"),
+      legend.key.height = grid::unit(0.4, "cm"),
+      panel.border      = ggplot2::element_blank(),
+      axis.line  = ggplot2::element_line(linewidth = 0.5, color = "black"),
+      axis.ticks = ggplot2::element_line(linewidth = 0.4, color = "black"),
+      plot.background   = ggplot2::element_rect(fill = "white", color = NA),
+      panel.background  = ggplot2::element_rect(fill = "white", color = NA)
     )
 }
 
@@ -992,5 +1081,352 @@ zeus_plot_intensity_response <- function(
       axis.line = ggplot2::element_line(linewidth = 0.5),
       axis.ticks = ggplot2::element_line(linewidth = 0.4),
       panel.spacing = grid::unit(1.2, "lines")
+    )
+}
+
+
+# Spectral waveform panel (10 wavelength blocks) --------------------------------
+
+#' Plot ERG waveforms split into per-wavelength-block facets
+#'
+#' @description
+#' Generates a publication-ready multi-panel waveform plot in which each panel
+#' corresponds to one wavelength block of the C0 (spectral) protocol — or, for
+#' single-wavelength (C1/white-light) data, one run block.  Within each panel,
+#' individual traces for each neutral-density (ND) level are drawn and
+#' color-coded using a perceptually uniform sequential palette (lightest = most
+#' attenuated / highest ND; darkest = least attenuated / lowest ND).
+#'
+#' This layout mirrors the Origin "spectral waveform" panel: the 10 wavelength
+#' blocks form a 2-row × 5-column grid. When photocell data are available a
+#' representative photocell pulse is overlaid at the bottom of every panel,
+#' positioned and scaled to match the Origin StimResp display convention.
+#'
+#' The time scale is shown underneath every individual panel (requires
+#' ggplot2 >= 3.4.0). Each panel's strip label is composed of two lines:
+#' \enumerate{
+#'   \item The wavelength prefix (C0) or block number (C1).
+#'   \item A metadata tag of the form `"Block N | C0/C1 | filename"`.
+#' }
+#' When `x` is a `zeus_stimresp` object the protocol and filename are
+#' auto-detected; they can also be supplied explicitly via `protocol_label`
+#' and `file_label`.
+#'
+#' @param x A `zeus_stimresp` object (output of [zeus_read_abf()]) or a
+#'   long-format waveform data frame containing at least `time`, `value`,
+#'   `stim_label`, `stim_nd`, and `block_index`.
+#' @param data_slot For `zeus_stimresp` objects, which component to use.
+#'   Default is `"traces_70"` (averaged traces). Can also be `"traces_280"`.
+#' @param channel_filter Optional channel to filter. Ignored when the selected
+#'   data slot has no `channel` column.
+#' @param stim_levels Optional numeric vector giving the desired ND levels to
+#'   display and their legend order (highest = dimmest first).  If `NULL`,
+#'   all ND levels present in the data are used in descending order.
+#' @param include_photocell Logical; if `TRUE` (default), overlays the mean
+#'   photocell trace on every panel when photocell data are available.
+#' @param photocell_filter Character pattern used to identify the photocell
+#'   channel when a `channel` column is present. Default is `"Photocell"`.
+#' @param photocell_color Color for the photocell overlay line. Default
+#'   `"black"`.
+#' @param photocell_relative_height Fraction of the global ERG amplitude range
+#'   that the photocell pulse occupies. Default is `0.20`.
+#' @param protocol_label Character string shown in every panel label to
+#'   identify the recording protocol (e.g. `"C0"` or `"C1"`). When `x` is a
+#'   `zeus_stimresp` object this is auto-detected from `x$protocol`; supply
+#'   this argument to override or when passing a plain data frame.
+#' @param file_label Character string shown in every panel label to identify
+#'   the source file (the `.abf` extension is excluded). When `x` is a
+#'   `zeus_stimresp` object this is auto-detected from `x$path`; supply this
+#'   argument to override or when passing a plain data frame.
+#' @param facet_ncol Number of columns in the facet grid. Default is `5`.
+#' @param base_size Base font size for the plot theme. Default is `10`.
+#'
+#' @return A `ggplot2` object.
+#' @export
+zeus_plot_spectral_waveform <- function(
+    x,
+    data_slot = c("traces_70", "traces_280"),
+    channel_filter = NULL,
+    stim_levels = NULL,
+    include_photocell = TRUE,
+    photocell_filter = "Photocell",
+    photocell_color = "black",
+    photocell_relative_height = 0.20,
+    protocol_label = NULL,
+    file_label = NULL,
+    facet_ncol = 5L,
+    base_size = 10
+) {
+  data_slot  <- match.arg(data_slot)
+  facet_ncol <- as.integer(facet_ncol)
+
+  prepared <- .zeus_prepare_plot_df(
+    x = x,
+    data_slot = data_slot,
+    channel_filter = channel_filter,
+    require_cols = c("time", "value"),
+    allow_stimresp = TRUE
+  )
+
+  df_plot              <- prepared$df_plot
+  df_photocell_source  <- prepared$df_photocell_source
+
+  # Auto-detect protocol and filename from a zeus_stimresp object.
+  if (inherits(x, "zeus_stimresp")) {
+    if (is.null(protocol_label) && !is.null(x$protocol)) {
+      protocol_label <- x$protocol
+    }
+    if (is.null(file_label) && !is.null(x$path)) {
+      file_label <- tools::file_path_sans_ext(basename(x$path))
+    }
+  }
+
+  if (!("stim_label" %in% names(df_plot))) {
+    stop("`x` must contain `stim_label`.", call. = FALSE)
+  }
+
+  if (!("stim_nd" %in% names(df_plot))) {
+    stop("`x` must contain `stim_nd`.", call. = FALSE)
+  }
+
+  # Internal helper: build the second line of the strip label for a single
+  # block.  Returns a string of the form "Block N | C0 | filename", omitting
+  # any component that is NA / NULL.
+  .make_block_sublabel <- function(block_idx, proto, fname) {
+    parts <- character(0)
+    if (!is.null(block_idx) && !is.na(block_idx)) {
+      parts <- c(parts, paste0("Block ", block_idx))
+    }
+    if (!is.null(proto) && nzchar(proto)) parts <- c(parts, proto)
+    if (!is.null(fname)  && nzchar(fname))  parts <- c(parts, fname)
+    paste(parts, collapse = " | ")  # ASCII separator: "Block N | C0 | filename"
+  }
+
+  # Extract the wavelength prefix: first non-whitespace token of stim_label.
+  # Expected formats: "650A 4.0" -> "650A", "570 5.0" -> "570",
+  #                   "White 6.0" -> "White".
+  df_plot <- df_plot |>
+    dplyr::mutate(
+      .wl_prefix = stringr::str_extract(.data$stim_label, "^\\S+")
+    )
+
+  unique_prefixes <- unique(df_plot$.wl_prefix)
+
+  if (length(unique_prefixes) > 1L) {
+    # C0-like: multiple wavelength prefixes — one per block already.
+    if ("block_index" %in% names(df_plot)) {
+      prefix_block_map <- df_plot |>
+        dplyr::distinct(.data$.wl_prefix, .data$block_index) |>
+        dplyr::arrange(.data$block_index)
+
+      # Build compound label: line 1 = wavelength; line 2 = Block N | proto | file
+      compound_labels <- vapply(
+        seq_len(nrow(prefix_block_map)),
+        function(i) {
+          sub_lbl <- .make_block_sublabel(
+            prefix_block_map$block_index[[i]], protocol_label, file_label
+          )
+          if (nzchar(sub_lbl)) {
+            paste0(prefix_block_map$.wl_prefix[[i]], "\n", sub_lbl)
+          } else {
+            prefix_block_map$.wl_prefix[[i]]
+          }
+        },
+        character(1L)
+      )
+      names(compound_labels) <- prefix_block_map$.wl_prefix
+      label_order <- prefix_block_map$.wl_prefix
+    } else {
+      # No block_index: just append proto / file as a second line when available.
+      sub_lbl <- .make_block_sublabel(NULL, protocol_label, file_label)
+      compound_labels <- vapply(
+        unique_prefixes,
+        function(p) if (nzchar(sub_lbl)) paste0(p, "\n", sub_lbl) else p,
+        character(1L)
+      )
+      names(compound_labels) <- unique_prefixes
+      label_order <- unique_prefixes
+    }
+
+    df_plot <- df_plot |>
+      dplyr::mutate(
+        block_label = factor(
+          compound_labels[.data$.wl_prefix],
+          levels = unique(compound_labels[label_order])
+        )
+      )
+  } else {
+    # C1-like: single wavelength prefix, use block_index to create per-block facets.
+    if (!("block_index" %in% names(df_plot))) {
+      stop(
+        "Cannot determine facet panels: `block_index` column is required ",
+        "when all stim_labels share the same wavelength prefix.",
+        call. = FALSE
+      )
+    }
+    block_order <- sort(unique(df_plot$block_index))
+
+    # Build label per block: "Block N | C1 | filename"
+    block_label_vec <- vapply(
+      block_order,
+      function(b) .make_block_sublabel(b, protocol_label, file_label),
+      character(1L)
+    )
+    names(block_label_vec) <- as.character(block_order)
+
+    df_plot <- df_plot |>
+      dplyr::mutate(
+        block_label = factor(
+          block_label_vec[as.character(.data$block_index)],
+          levels = block_label_vec
+        )
+      )
+  }
+
+  # ND levels for color ordering (highest ND = dimmest stimulus shown first).
+  if (is.null(stim_levels)) {
+    nd_levels <- sort(unique(df_plot$stim_nd), decreasing = TRUE)
+  } else {
+    nd_levels <- as.numeric(stim_levels)
+  }
+  nd_levels_chr <- as.character(nd_levels)
+
+  # Aggregate: mean across any repeated rows for the same (block, nd, time).
+  df_agg <- df_plot |>
+    dplyr::mutate(
+      nd_group = factor(as.character(.data$stim_nd), levels = nd_levels_chr)
+    ) |>
+    dplyr::group_by(.data$block_label, .data$nd_group, .data$time_ms) |>
+    dplyr::summarise(
+      signal = mean(.data$value, na.rm = TRUE),
+      .groups = "drop"
+    )
+
+  # Publication-quality sequential palette:
+  # highest ND (dimmest stimulus) → lightest blue;
+  # lowest  ND (brightest stimulus) → darkest navy.
+  n_nd <- length(nd_levels_chr)
+  nd_palette_fn <- grDevices::colorRampPalette(
+    c("#C6DBEF", "#9ECAE1", "#6BAED6", "#3182BD", "#08519C", "#08306B")
+  )
+  plot_colors <- stats::setNames(nd_palette_fn(n_nd), nd_levels_chr)
+
+  # Photocell — scale once globally, then replicate across all panels.
+  df_photocell_panels <- NULL
+
+  if (isTRUE(include_photocell) && !is.null(df_photocell_source)) {
+    erg_ymin  <- min(df_agg$signal, na.rm = TRUE)
+    erg_ymax  <- max(df_agg$signal, na.rm = TRUE)
+    erg_range <- erg_ymax - erg_ymin
+
+    df_pc_scaled <- .zeus_scale_photocell(
+      df_photocell_source       = df_photocell_source,
+      photocell_filter          = photocell_filter,
+      erg_ymin                  = erg_ymin,
+      erg_range                 = erg_range,
+      photocell_relative_height = photocell_relative_height
+    )
+
+    if (!is.null(df_pc_scaled)) {
+      # tidyr::crossing() efficiently duplicates the scaled photocell trace for
+      # every facet panel so geom_line draws it in each subplot.
+      panel_levels <- levels(df_agg$block_label)
+      df_photocell_panels <- tidyr::crossing(
+        df_pc_scaled,
+        block_label = factor(panel_levels, levels = panel_levels)
+      )
+    }
+  }
+
+  # Facet control: show x-axis on ALL panels (ggplot2 >= 3.4.0).
+  # Construct the facet call defensively; if the installed ggplot2 is older
+  # the function falls back silently and x-axes are shown only on the bottom
+  # row of the grid.
+  facet_layer <- tryCatch(
+    ggplot2::facet_wrap(~block_label, ncol = facet_ncol, axes = "all_x"),
+    error = function(e) {
+      message(
+        "zeus_plot_spectral_waveform: `axes = 'all_x'` requires ggplot2 >= 3.4.0; ",
+        "falling back to x-axis on bottom row only."
+      )
+      ggplot2::facet_wrap(~block_label, ncol = facet_ncol)
+    }
+  )
+
+  # Build the plot -----------------------------------------------------------
+  p <- ggplot2::ggplot(
+    df_agg,
+    ggplot2::aes(
+      x     = .data$time_ms,
+      y     = .data$signal,
+      color = .data$nd_group,
+      group = .data$nd_group
+    )
+  ) +
+    ggplot2::geom_line(linewidth = 0.55, lineend = "round", alpha = 0.95) +
+    facet_layer
+
+  if (!is.null(df_photocell_panels)) {
+    p <- p +
+      ggplot2::geom_line(
+        data = df_photocell_panels,
+        ggplot2::aes(x = .data$time_ms, y = .data$signal),
+        color       = photocell_color,
+        linewidth   = 0.45,
+        alpha       = 0.85,
+        inherit.aes = FALSE,
+        show.legend = FALSE,
+        lineend     = "round"
+      )
+  }
+
+  p +
+    ggplot2::scale_color_manual(
+      values = plot_colors,
+      name   = "Stimulus ND",
+      drop   = FALSE
+    ) +
+    ggplot2::guides(
+      color = ggplot2::guide_legend(
+        title = "Stimulus ND",
+        override.aes = list(linewidth = 1.2, alpha = 1)
+      )
+    ) +
+    ggplot2::scale_x_continuous(
+      breaks = scales::pretty_breaks(n = 4),
+      expand = ggplot2::expansion(mult = c(0.01, 0.03))
+    ) +
+    ggplot2::scale_y_continuous(
+      breaks = scales::pretty_breaks(n = 4),
+      expand = ggplot2::expansion(mult = c(0.05, 0.08))
+    ) +
+    ggplot2::labs(
+      title = "Spectral ERG Waveforms by Wavelength Block",
+      x     = "Time (ms)",
+      y     = expression("Response (" * mu * "V)")
+    ) +
+    ggplot2::theme_classic(base_size = base_size) +
+    ggplot2::theme(
+      plot.title = ggplot2::element_text(
+        face   = "bold",
+        hjust  = 0.5,
+        size   = ggplot2::rel(1.1),
+        margin = ggplot2::margin(b = 8)
+      ),
+      axis.title       = ggplot2::element_text(face = "bold"),
+      axis.text        = ggplot2::element_text(color = "black", size = ggplot2::rel(0.8)),
+      legend.title     = ggplot2::element_text(face = "bold"),
+      legend.text      = ggplot2::element_text(size = ggplot2::rel(0.85)),
+      legend.position  = "right",
+      legend.key.width  = grid::unit(1.0, "cm"),
+      legend.key.height = grid::unit(0.4, "cm"),
+      strip.background = ggplot2::element_blank(),
+      strip.text       = ggplot2::element_text(face = "bold", size = ggplot2::rel(0.95)),
+      panel.spacing.x  = grid::unit(0.6, "lines"),
+      panel.spacing.y  = grid::unit(0.8, "lines"),
+      axis.line        = ggplot2::element_line(linewidth = 0.45, color = "black"),
+      axis.ticks       = ggplot2::element_line(linewidth = 0.35, color = "black"),
+      plot.background  = ggplot2::element_rect(fill = "white", color = NA),
+      panel.background = ggplot2::element_rect(fill = "white", color = NA)
     )
 }
