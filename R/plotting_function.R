@@ -290,7 +290,7 @@
 #' trace so that it appears below the ERG waveform — matching the display
 #' convention used in Origin StimResp outputs.
 #'
-#' The photocell is normalized to \[0, 1\], scaled to occupy
+#' The photocell is normalized to [0, 1], scaled to occupy
 #' `photocell_relative_height * erg_range` in Y units, and shifted so its
 #' baseline sits just below `erg_ymin`.
 #'
@@ -432,7 +432,7 @@
 #'   below the minimum ERG value.
 #' @param photocell_relative_height Fraction of the ERG amplitude range that
 #'   the photocell pulse should occupy when `photocell_auto_scale = TRUE`.
-#'   Default is `0.20` (20 \% of the ERG range).
+#'   Default is `0.20` (20% of the ERG range).
 #' @param a_window Numeric length-2 vector giving the A-wave search interval in
 #'   milliseconds.
 #' @param b_window Numeric length-2 vector giving the B-wave search interval in
@@ -1251,22 +1251,29 @@ zeus_plot_spectral_waveform <- function(
     )
 
     if (!is.null(df_pc_scaled)) {
-      # Duplicate the scaled photocell trace for every panel.
+      # tidyr::crossing() efficiently duplicates the scaled photocell trace for
+      # every facet panel so geom_line draws it in each subplot.
       panel_levels <- levels(df_agg$block_label)
-      df_photocell_panels <- lapply(panel_levels, function(lbl) {
-        df_pc_scaled |>
-          dplyr::mutate(block_label = factor(lbl, levels = panel_levels))
-      }) |>
-        dplyr::bind_rows()
+      df_photocell_panels <- tidyr::crossing(
+        df_pc_scaled,
+        block_label = factor(panel_levels, levels = panel_levels)
+      )
     }
   }
 
   # Facet control: show x-axis on ALL panels (ggplot2 >= 3.4.0).
-  # Construct the facet call defensively so the package still works on
-  # older ggplot2 versions (axes is simply ignored there via tryCatch).
+  # Construct the facet call defensively; if the installed ggplot2 is older
+  # the function falls back silently and x-axes are shown only on the bottom
+  # row of the grid.
   facet_layer <- tryCatch(
     ggplot2::facet_wrap(~block_label, ncol = facet_ncol, axes = "all_x"),
-    error = function(e) ggplot2::facet_wrap(~block_label, ncol = facet_ncol)
+    error = function(e) {
+      message(
+        "zeus_plot_spectral_waveform: `axes = 'all_x'` requires ggplot2 >= 3.4.0. ",
+        "Falling back to default axis placement (x-axis on bottom row only)."
+      )
+      ggplot2::facet_wrap(~block_label, ncol = facet_ncol)
+    }
   )
 
   # Build the plot -----------------------------------------------------------
