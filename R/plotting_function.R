@@ -337,7 +337,11 @@
 #'   milliseconds.
 #' @param stim_levels Optional vector giving the desired order of stimulus labels
 #'   in the legend. If `NULL`, uses the order present in the data.
-#' @param color_by One of `"stim_label"`, `"stim_nd"`, or `"wavelength"`.
+#' @param color_by One of `"stim_nd"`, `"stim_label"`, or `"wavelength"`.
+#'   Defaults to `"stim_nd"` so that traces with the same neutral-density level
+#'   are averaged together regardless of wavelength — matching the Origin
+#'   StimResp grouping for spectral (C0) protocols.  Use `"stim_label"` to keep
+#'   each wavelength × ND combination as a separate trace.
 #' @param overall_color Color for the overall mean line.
 #' @param marker_color Color for marker reference lines.
 #' @param base_size Base font size for the plot theme.
@@ -360,7 +364,7 @@ zeus_plot_mean_waveform <- function(
     b_window = c(400, 700),
     d_window = c(700, 1000),
     stim_levels = NULL,
-    color_by = c("stim_label", "stim_nd", "wavelength"),
+    color_by = c("stim_nd", "stim_label", "wavelength"),
     overall_color = "red",
     marker_color = "black",
     base_size = 12
@@ -992,5 +996,186 @@ zeus_plot_intensity_response <- function(
       axis.line = ggplot2::element_line(linewidth = 0.5),
       axis.ticks = ggplot2::element_line(linewidth = 0.4),
       panel.spacing = grid::unit(1.2, "lines")
+    )
+}
+
+
+# Spectral waveform panel (10 wavelength blocks) --------------------------------
+
+#' Plot ERG waveforms split into per-wavelength-block facets
+#'
+#' @description
+#' Generates a multi-panel waveform plot in which each panel corresponds to one
+#' wavelength block of the C0 (spectral) protocol — or, for single-wavelength
+#' (C1/white-light) data, one run block.  Within each panel, individual traces
+#' for each neutral-density (ND) level are drawn and color-coded.
+#'
+#' This layout mirrors the Origin "spectral waveform" panel: the 10 wavelength
+#' blocks form a 2-row × 5-column grid and ND levels within each block are
+#' shown as separate, individually colored traces.
+#'
+#' @param x A `zeus_stimresp` object (output of [zeus_read_abf()]) or a
+#'   long-format waveform data frame containing at least `time`, `value`,
+#'   `stim_label`, `stim_nd`, and `block_index`.
+#' @param data_slot For `zeus_stimresp` objects, which component to use.
+#'   Default is `"traces_70"` (averaged traces). Can also be `"traces_280"`.
+#' @param channel_filter Optional channel to filter. Ignored when the selected
+#'   data slot has no `channel` column.
+#' @param stim_levels Optional numeric vector giving the desired ND levels to
+#'   display and their legend order (highest = dimmest first).  If `NULL`,
+#'   all ND levels present in the data are used in descending order.
+#' @param facet_ncol Number of columns in the facet grid. Default is `5`.
+#' @param base_size Base font size for the plot theme. Default is `11`.
+#'
+#' @return A `ggplot2` object.
+#' @export
+zeus_plot_spectral_waveform <- function(
+    x,
+    data_slot = c("traces_70", "traces_280"),
+    channel_filter = NULL,
+    stim_levels = NULL,
+    facet_ncol = 5L,
+    base_size = 11
+) {
+  data_slot <- match.arg(data_slot)
+  facet_ncol <- as.integer(facet_ncol)
+
+  prepared <- .zeus_prepare_plot_df(
+    x = x,
+    data_slot = data_slot,
+    channel_filter = channel_filter,
+    require_cols = c("time", "value"),
+    allow_stimresp = TRUE
+  )
+
+  df_plot <- prepared$df_plot
+
+  if (!("stim_label" %in% names(df_plot))) {
+    stop("`x` must contain `stim_label`.", call. = FALSE)
+  }
+
+  if (!("stim_nd" %in% names(df_plot))) {
+    stop("`x` must contain `stim_nd`.", call. = FALSE)
+  }
+
+  # Derive a per-block label from the wavelength prefix of stim_label.
+  # For C0:  "650A 4.0" -> "650A", "570 5.0" -> "570", etc.
+  # For C1:  "White 6.0" -> "White" (all same; fall back to block_index).
+  df_plot <- df_plot |>
+    dplyr::mutate(
+      .wl_prefix = stringr::str_extract(.data$stim_label, "^\\S+")
+    )
+
+  unique_prefixes <- unique(df_plot$.wl_prefix)
+
+  if (length(unique_prefixes) > 1L) {
+    # C0-like: multiple wavelength prefixes — one per block already.
+    # Establish panel order from block_index when available.
+    if ("block_index" %in% names(df_plot)) {
+      label_order <- df_plot |>
+        dplyr::distinct(.data$.wl_prefix, .data$block_index) |>
+        dplyr::arrange(.data$block_index) |>
+        dplyr::pull(.data$.wl_prefix)
+    } else {
+      label_order <- unique_prefixes
+    }
+    df_plot <- df_plot |>
+      dplyr::mutate(
+        block_label = factor(.data$.wl_prefix, levels = unique(label_order))
+      )
+  } else {
+    # C1-like: single wavelength, use block_index to create per-block facets.
+    if (!("block_index" %in% names(df_plot))) {
+      stop(
+        "Cannot determine facet panels: `block_index` column is required ",
+        "when all stim_labels share the same wavelength prefix.",
+        call. = FALSE
+      )
+    }
+    block_order <- sort(unique(df_plot$block_index))
+    df_plot <- df_plot |>
+      dplyr::mutate(
+        block_label = factor(
+          paste0("Block ", .data$block_index),
+          levels = paste0("Block ", block_order)
+        )
+      )
+  }
+
+  # ND levels for color ordering (highest ND = dimmest stimulus shown first).
+  if (is.null(stim_levels)) {
+    nd_levels <- sort(unique(df_plot$stim_nd), decreasing = TRUE)
+  } else {
+    nd_levels <- as.numeric(stim_levels)
+  }
+  nd_levels_chr <- as.character(nd_levels)
+
+  # Aggregate: mean across any repeated rows for the same (block, nd, time).
+  df_agg <- df_plot |>
+    dplyr::mutate(
+      nd_group = factor(as.character(.data$stim_nd), levels = nd_levels_chr)
+    ) |>
+    dplyr::group_by(.data$block_label, .data$nd_group, .data$time_ms) |>
+    dplyr::summarise(
+      signal = mean(.data$value, na.rm = TRUE),
+      .groups = "drop"
+    )
+
+  # Color palette — same tol-palette used elsewhere in ZEUS.
+  base_palette <- c(
+    "#332288", "#88CCEE", "#44AA99", "#117733",
+    "#999933", "#DDCC77", "#CC6677", "#882255", "#AA4499"
+  )
+  n_nd <- length(nd_levels_chr)
+  plot_colors <- stats::setNames(
+    rep(base_palette, length.out = n_nd),
+    nd_levels_chr
+  )
+
+  ggplot2::ggplot(
+    df_agg,
+    ggplot2::aes(
+      x     = .data$time_ms,
+      y     = .data$signal,
+      color = .data$nd_group,
+      group = .data$nd_group
+    )
+  ) +
+    ggplot2::geom_line(linewidth = 0.55, lineend = "round", alpha = 0.95) +
+    ggplot2::facet_wrap(~block_label, ncol = facet_ncol) +
+    ggplot2::scale_color_manual(
+      values = plot_colors,
+      name   = "Stimulus ND",
+      drop   = FALSE
+    ) +
+    ggplot2::scale_x_continuous(
+      breaks = scales::pretty_breaks(n = 4),
+      expand = ggplot2::expansion(mult = c(0.01, 0.03))
+    ) +
+    ggplot2::scale_y_continuous(
+      breaks = scales::pretty_breaks(n = 4),
+      expand = ggplot2::expansion(mult = c(0.03, 0.08))
+    ) +
+    ggplot2::labs(
+      title = "Spectral ERG Waveforms by Wavelength Block",
+      x     = "Time (ms)",
+      y     = expression("Response (" * mu * "V)")
+    ) +
+    ggplot2::theme_classic(base_size = base_size) +
+    ggplot2::theme(
+      plot.title = ggplot2::element_text(
+        face   = "bold",
+        hjust  = 0.5,
+        margin = ggplot2::margin(b = 10)
+      ),
+      axis.title   = ggplot2::element_text(face = "bold"),
+      axis.text    = ggplot2::element_text(color = "black"),
+      legend.title = ggplot2::element_text(face = "bold"),
+      legend.position = "right",
+      strip.background = ggplot2::element_blank(),
+      strip.text = ggplot2::element_text(face = "bold"),
+      panel.spacing = grid::unit(0.8, "lines"),
+      axis.line  = ggplot2::element_line(linewidth = 0.5),
+      axis.ticks = ggplot2::element_line(linewidth = 0.4)
     )
 }
