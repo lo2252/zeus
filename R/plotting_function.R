@@ -1103,7 +1103,14 @@ zeus_plot_intensity_response <- function(
 #' positioned and scaled to match the Origin StimResp display convention.
 #'
 #' The time scale is shown underneath every individual panel (requires
-#' ggplot2 ≥ 3.4.0).
+#' ggplot2 >= 3.4.0). Each panel's strip label is composed of two lines:
+#' \enumerate{
+#'   \item The wavelength prefix (C0) or block number (C1).
+#'   \item A metadata tag of the form `"Block N · C0/C1 · filename"`.
+#' }
+#' When `x` is a `zeus_stimresp` object the protocol and filename are
+#' auto-detected; they can also be supplied explicitly via `protocol_label`
+#' and `file_label`.
 #'
 #' @param x A `zeus_stimresp` object (output of [zeus_read_abf()]) or a
 #'   long-format waveform data frame containing at least `time`, `value`,
@@ -1123,6 +1130,14 @@ zeus_plot_intensity_response <- function(
 #'   `"black"`.
 #' @param photocell_relative_height Fraction of the global ERG amplitude range
 #'   that the photocell pulse occupies. Default is `0.20`.
+#' @param protocol_label Character string shown in every panel label to
+#'   identify the recording protocol (e.g. `"C0"` or `"C1"`). When `x` is a
+#'   `zeus_stimresp` object this is auto-detected from `x$protocol`; supply
+#'   this argument to override or when passing a plain data frame.
+#' @param file_label Character string shown in every panel label to identify
+#'   the source file (the `.abf` extension is excluded). When `x` is a
+#'   `zeus_stimresp` object this is auto-detected from `x$path`; supply this
+#'   argument to override or when passing a plain data frame.
 #' @param facet_ncol Number of columns in the facet grid. Default is `5`.
 #' @param base_size Base font size for the plot theme. Default is `10`.
 #'
@@ -1137,6 +1152,8 @@ zeus_plot_spectral_waveform <- function(
     photocell_filter = "Photocell",
     photocell_color = "black",
     photocell_relative_height = 0.20,
+    protocol_label = NULL,
+    file_label = NULL,
     facet_ncol = 5L,
     base_size = 10
 ) {
@@ -1154,12 +1171,35 @@ zeus_plot_spectral_waveform <- function(
   df_plot              <- prepared$df_plot
   df_photocell_source  <- prepared$df_photocell_source
 
+  # Auto-detect protocol and filename from a zeus_stimresp object.
+  if (inherits(x, "zeus_stimresp")) {
+    if (is.null(protocol_label) && !is.null(x$protocol)) {
+      protocol_label <- x$protocol
+    }
+    if (is.null(file_label) && !is.null(x$path)) {
+      file_label <- tools::file_path_sans_ext(basename(x$path))
+    }
+  }
+
   if (!("stim_label" %in% names(df_plot))) {
     stop("`x` must contain `stim_label`.", call. = FALSE)
   }
 
   if (!("stim_nd" %in% names(df_plot))) {
     stop("`x` must contain `stim_nd`.", call. = FALSE)
+  }
+
+  # Internal helper: build the second line of the strip label for a single
+  # block.  Returns a string of the form "Block N · C0 · filename", omitting
+  # any component that is NA / NULL.
+  .make_block_sublabel <- function(block_idx, proto, fname) {
+    parts <- character(0)
+    if (!is.null(block_idx) && !is.na(block_idx)) {
+      parts <- c(parts, paste0("Block ", block_idx))
+    }
+    if (!is.null(proto) && nzchar(proto)) parts <- c(parts, proto)
+    if (!is.null(fname)  && nzchar(fname))  parts <- c(parts, fname)
+    paste(parts, collapse = " \u00b7 ")  # Unicode middle dot separator
   }
 
   # Derive a per-block label from the wavelength prefix of stim_label.
@@ -1174,21 +1214,49 @@ zeus_plot_spectral_waveform <- function(
 
   if (length(unique_prefixes) > 1L) {
     # C0-like: multiple wavelength prefixes — one per block already.
-    # Establish panel order from block_index when available.
     if ("block_index" %in% names(df_plot)) {
-      label_order <- df_plot |>
+      prefix_block_map <- df_plot |>
         dplyr::distinct(.data$.wl_prefix, .data$block_index) |>
-        dplyr::arrange(.data$block_index) |>
-        dplyr::pull(.data$.wl_prefix)
+        dplyr::arrange(.data$block_index)
+
+      # Build compound label: line 1 = wavelength; line 2 = Block N · proto · file
+      compound_labels <- vapply(
+        seq_len(nrow(prefix_block_map)),
+        function(i) {
+          sub_lbl <- .make_block_sublabel(
+            prefix_block_map$block_index[[i]], protocol_label, file_label
+          )
+          if (nzchar(sub_lbl)) {
+            paste0(prefix_block_map$.wl_prefix[[i]], "\n", sub_lbl)
+          } else {
+            prefix_block_map$.wl_prefix[[i]]
+          }
+        },
+        character(1L)
+      )
+      names(compound_labels) <- prefix_block_map$.wl_prefix
+      label_order <- prefix_block_map$.wl_prefix
     } else {
+      # No block_index: just append proto / file as a second line when available.
+      sub_lbl <- .make_block_sublabel(NULL, protocol_label, file_label)
+      compound_labels <- vapply(
+        unique_prefixes,
+        function(p) if (nzchar(sub_lbl)) paste0(p, "\n", sub_lbl) else p,
+        character(1L)
+      )
+      names(compound_labels) <- unique_prefixes
       label_order <- unique_prefixes
     }
+
     df_plot <- df_plot |>
       dplyr::mutate(
-        block_label = factor(.data$.wl_prefix, levels = unique(label_order))
+        block_label = factor(
+          compound_labels[.data$.wl_prefix],
+          levels = unique(compound_labels[label_order])
+        )
       )
   } else {
-    # C1-like: single wavelength, use block_index to create per-block facets.
+    # C1-like: single wavelength prefix, use block_index to create per-block facets.
     if (!("block_index" %in% names(df_plot))) {
       stop(
         "Cannot determine facet panels: `block_index` column is required ",
@@ -1197,11 +1265,20 @@ zeus_plot_spectral_waveform <- function(
       )
     }
     block_order <- sort(unique(df_plot$block_index))
+
+    # Build label per block: "Block N · C1 · filename"
+    block_label_vec <- vapply(
+      block_order,
+      function(b) .make_block_sublabel(b, protocol_label, file_label),
+      character(1L)
+    )
+    names(block_label_vec) <- as.character(block_order)
+
     df_plot <- df_plot |>
       dplyr::mutate(
         block_label = factor(
-          paste0("Block ", .data$block_index),
-          levels = paste0("Block ", block_order)
+          block_label_vec[as.character(.data$block_index)],
+          levels = block_label_vec
         )
       )
   }
