@@ -15,6 +15,7 @@ export(smooth_stimresp_traces)
 export(summarize_stimresp_qc)
 export(zeus_plot_intensity_response)
 export(zeus_plot_mean_waveform)
+export(zeus_plot_spectral_waveform)
 export(zeus_read_abf)
 export(zero_baseline_traces)
 
