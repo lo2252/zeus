@@ -9,7 +9,7 @@
   photocell_filter = "Photocell",
   erg_ymin,
   erg_range,
-  photocell_relative_height = 0.2
+  photocell_relative_height = 1.1
 )
 }
 \arguments{
@@ -26,7 +26,7 @@ positioning).}
 scaling).}
 
 \item{photocell_relative_height}{Fraction of \code{erg_range} that the photocell
-pulse should occupy. Default is \code{0.20}.}
+pulse should occupy. Default is \code{1.1}.}
 }
 \value{
 A data frame with \code{time_ms} and \code{signal} columns ready to overlay
