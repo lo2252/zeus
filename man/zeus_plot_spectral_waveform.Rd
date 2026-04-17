@@ -12,7 +12,7 @@ zeus_plot_spectral_waveform(
   include_photocell = TRUE,
   photocell_filter = "Photocell",
   photocell_color = "black",
-  photocell_relative_height = 0.2,
+  photocell_relative_height = 1.1,
   protocol_label = NULL,
   file_label = NULL,
   facet_ncol = 5L,

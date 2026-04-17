@@ -8,6 +8,7 @@ measure_trace_window(
   trace_df,
   baseline_window_ms = NULL,
   response_window_ms = NULL,
+  awave_window_ms = NULL,
   stimulus_onset_ms = 400,
   time_reference = c("absolute", "stimulus"),
   trough_search_window_ms = NULL,

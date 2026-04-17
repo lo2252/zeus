@@ -15,7 +15,7 @@ zeus_plot_mean_waveform(
   photocell_filter = "Photocell",
   photocell_color = "black",
   photocell_auto_scale = TRUE,
-  photocell_relative_height = 0.2,
+  photocell_relative_height = 1.1,
   a_window = c(400, 700),
   b_window = c(400, 700),
   d_window = c(700, 1000),
@@ -61,7 +61,7 @@ below the minimum ERG value.}
 
 \item{photocell_relative_height}{Fraction of the ERG amplitude range that
 the photocell pulse should occupy when \code{photocell_auto_scale = TRUE}.
-Default is \code{0.20} (20\% of the ERG range).}
+Default is \code{1.1} (110\% of the ERG range).}
 
 \item{a_window}{Numeric length-2 vector giving the A-wave search interval in
 milliseconds.}
