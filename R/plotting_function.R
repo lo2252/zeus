@@ -303,7 +303,7 @@
 #' @param erg_range Numeric. Total Y range of the ERG signal (used for
 #'   scaling).
 #' @param photocell_relative_height Fraction of `erg_range` that the photocell
-#'   pulse should occupy. Default is `0.20`.
+#'   pulse should occupy. Default is `1.1`.
 #'
 #' @return A data frame with `time_ms` and `signal` columns ready to overlay
 #'   on a plot, or `NULL` if no valid photocell data could be prepared.
@@ -313,7 +313,7 @@
     photocell_filter = "Photocell",
     erg_ymin,
     erg_range,
-    photocell_relative_height = 0.20
+    photocell_relative_height = 1.1
 ) {
   if (is.null(df_photocell_source) || !is.data.frame(df_photocell_source)) {
     return(NULL)
@@ -370,9 +370,9 @@
   }
 
   # Target: photocell occupies photocell_relative_height * erg_range in Y.
-  # Baseline is positioned slightly below erg_ymin (5 % gap).
+  # Baseline is positioned slightly below erg_ymin (0.1 % gap).
   target_height <- photocell_relative_height * erg_range
-  pc_baseline   <- erg_ymin - 0.05 * erg_range
+  pc_baseline   <- erg_ymin - 0.001 * erg_range
 
   pc |>
     dplyr::mutate(
@@ -432,7 +432,7 @@
 #'   below the minimum ERG value.
 #' @param photocell_relative_height Fraction of the ERG amplitude range that
 #'   the photocell pulse should occupy when `photocell_auto_scale = TRUE`.
-#'   Default is `0.20` (20% of the ERG range).
+#'   Default is `1.1` (110% of the ERG range).
 #' @param a_window Numeric length-2 vector giving the A-wave search interval in
 #'   milliseconds.
 #' @param b_window Numeric length-2 vector giving the B-wave search interval in
@@ -463,7 +463,7 @@ zeus_plot_mean_waveform <- function(
     photocell_filter = "Photocell",
     photocell_color = "black",
     photocell_auto_scale = TRUE,
-    photocell_relative_height = 0.20,
+    photocell_relative_height = 1.1,
     a_window = c(400, 700),
     b_window = c(400, 700),
     d_window = c(700, 1000),
@@ -528,9 +528,8 @@ zeus_plot_mean_waveform <- function(
       color_group = factor(.data$color_group, levels = stim_levels_chr)
     )
 
-  # Publication-quality sequential palette:
-  # highest ND (dimmest stimulus) → lightest blue;
-  # lowest  ND (brightest stimulus) → darkest navy.
+  # Sequential palette:
+
   nd_palette_fn <- grDevices::colorRampPalette(
     c("#C6DBEF", "#9ECAE1", "#6BAED6", "#3182BD", "#08519C", "#08306B")
   )
