@@ -7,9 +7,10 @@
 # Or interactively from an R session with the working directory at the
 # package root (pkgload::load_all() is called automatically).
 #
-# REQUIRED FILES (relative to package root):
-#   inst/extdata/26225004.abf                        -- C1 ABF recording
-#   temp_file/26225004_origin_export_with_d_wave.xlsx -- Origin StimResp export
+# REQUIRED FILES:
+#   inst/extdata/26225004.abf
+#   /Volumes/LOGANUSB/origin_files/26225004_origin_export_with_d_wave.xlsx
+#   Or temp_file/26225004_origin_export_with_d_wave.xlsx
 # ==============================================================================
 
 # ------------------------------------------------------------------------------
@@ -35,15 +36,69 @@ suppressPackageStartupMessages({
 
 abf_path    <- file.path("inst", "extdata", "26225004.abf")
 xlsx_path   <- file.path("temp_file", "26225004_origin_export_with_d_wave.xlsx")
+xlsx_fallback <- file.path("/Volumes", "LOGANUSB", "origin_files", "26225004_origin_export_with_d_wave.xlsx")
 sheet_name  <- "StimResp"
 erg_channel <- "ERG DAM80"
+
+if (!file.exists(xlsx_path) && file.exists(xlsx_fallback)) {
+  xlsx_path <- xlsx_fallback
+}
 
 stopifnot(
   "C1 ABF not found - expected at inst/extdata/26225004.abf" =
     file.exists(abf_path),
-  "C1 Origin xlsx not found - expected at temp_file/26225004_origin_export_with_d_wave.xlsx" =
+  "C1 Origin xlsx not found - expected at temp_file/... or /Volumes/LOGANUSB/origin_files/..." =
     file.exists(xlsx_path)
 )
+
+read_origin_irrad <- function(path, protocol_tbl) {
+  raw_irrad <- readxl::read_excel(path, sheet = "Irrad-wl-Amp", col_names = TRUE)
+  names(raw_irrad) <- make.names(names(raw_irrad), unique = TRUE)
+
+  origin_irrad <- raw_irrad[-c(1, 2), ] |>
+    dplyr::mutate(row_id = dplyr::row_number())
+
+  numeric_cols <- c(
+    "wavelength", "stimulus.wl", "stimulus.ND", "stim.irradiance",
+    "response", "noise", "dwave", "peaktime", "troughtime", "dpeakime",
+    "awave"
+  )
+
+  for (nm in intersect(numeric_cols, names(origin_irrad))) {
+    origin_irrad[[nm]] <- suppressWarnings(as.numeric(origin_irrad[[nm]]))
+  }
+
+  protocol_tbl <- protocol_tbl |>
+    dplyr::mutate(row_id = dplyr::row_number())
+
+  origin_irrad |>
+    dplyr::filter(!is.na(.data$stimulus.ND)) |>
+    dplyr::left_join(
+      protocol_tbl |>
+        dplyr::transmute(
+          row_id,
+          stim_index,
+          stim_label,
+          protocol_id,
+          wavelength_protocol = wavelength,
+          stim_nd_protocol = stim_nd
+        ),
+      by = "row_id"
+    )
+}
+
+summarise_agreement <- function(df, val_col, ref_col, label) {
+  diff_col <- df[[val_col]] - df[[ref_col]]
+  cat(sprintf(
+    "\n  %s vs Origin:\n    n=%d  mean_diff=%.3f  mean|diff|=%.3f  RMSE=%.3f  max|diff|=%.3f  r=%.6f\n",
+    label, nrow(df),
+    mean(diff_col, na.rm = TRUE),
+    mean(abs(diff_col), na.rm = TRUE),
+    sqrt(mean(diff_col^2, na.rm = TRUE)),
+    max(abs(diff_col), na.rm = TRUE),
+    suppressWarnings(cor(df[[val_col]], df[[ref_col]], use = "complete.obs"))
+  ))
+}
 
 # ------------------------------------------------------------------------------
 # 3. Import ZEUS C1 data
@@ -128,7 +183,7 @@ zeus_70 <- protocol_table_C1() |>
 protocol_compare <- origin_70 |>
   dplyr::rename(origin_label = stim_label) |>
   dplyr::left_join(
-    zeus_70 |> dplyr::select(.data$stim_index, zeus_label = stim_label),
+    zeus_70 |> dplyr::select("stim_index", zeus_label = stim_label),
     by = "stim_index"
   ) |>
   dplyr::mutate(match = .data$origin_label == .data$zeus_label)
@@ -166,7 +221,7 @@ origin_280 <- origin_70 |>
 sweep_compare <- origin_280 |>
   dplyr::rename(origin_label = stim_label) |>
   dplyr::left_join(
-    sweep_tbl |> dplyr::select(.data$sweep, zeus_label),
+    sweep_tbl |> dplyr::select("sweep", "zeus_label"),
     by = "sweep"
   ) |>
   dplyr::mutate(match = .data$origin_label == .data$zeus_label)
@@ -295,7 +350,96 @@ if (nrow(wave_compare) == 0L) {
 }
 
 # ------------------------------------------------------------------------------
-# 8. Summary
+# 8. Irrad-wl-Amp comparison: per-stimulus measurements and summary statistics
+# ------------------------------------------------------------------------------
+
+cat("\n-- Comparing C1 Irrad-wl-Amp statistics to Origin --\n")
+
+origin_irrad <- read_origin_irrad(xlsx_path, zeus_70)
+
+zeus_irrad <- extract_irrad_wl_amp(zeus_obj)
+
+irrad_compare <- origin_irrad |>
+  dplyr::select(
+    "stim_index",
+    "stim_label",
+    origin_response = .data$response,
+    origin_awave = .data$awave,
+    origin_dwave = .data$dwave,
+    origin_peaktime = .data$peaktime,
+    origin_troughtime = .data$troughtime,
+    origin_dpeaktime = .data$dpeakime
+  ) |>
+  dplyr::inner_join(
+    zeus_irrad |>
+      dplyr::select(
+        "stim_index",
+        "stim_label",
+        zeus_amp = .data$amp_mv,
+        zeus_response_integral = .data$response_integral_mv,
+        zeus_awave = .data$awave_mv,
+        zeus_dwave = .data$dwave_mv,
+        zeus_peaktime = .data$peak_time_poststim_ms,
+        zeus_troughtime = .data$trough_time_poststim_ms,
+        zeus_dpeaktime = .data$dpeak_time_poststim_ms
+      ),
+    by = c("stim_index", "stim_label")
+  )
+
+cat(sprintf("  Matched Irrad-wl-Amp rows: %d\n", nrow(irrad_compare)))
+
+if (nrow(irrad_compare) > 0L) {
+  summarise_agreement(irrad_compare, "zeus_amp", "origin_response", "ZEUS B-wave amplitude (amp_mv)")
+  summarise_agreement(irrad_compare, "zeus_response_integral", "origin_response", "ZEUS response integral")
+  summarise_agreement(irrad_compare, "zeus_awave", "origin_awave", "ZEUS A-wave amplitude")
+  summarise_agreement(irrad_compare, "zeus_dwave", "origin_dwave", "ZEUS D-wave amplitude")
+  summarise_agreement(irrad_compare, "zeus_peaktime", "origin_peaktime", "ZEUS B-wave peak time (post-stim)")
+  summarise_agreement(irrad_compare, "zeus_troughtime", "origin_troughtime", "ZEUS A-wave trough time (post-stim)")
+  summarise_agreement(irrad_compare, "zeus_dpeaktime", "origin_dpeaktime", "ZEUS D-wave peak time (post-stim)")
+}
+
+origin_irrad_for_stats <- origin_irrad |>
+  dplyr::transmute(
+    protocol_id = .data$protocol_id,
+    stim_index = .data$stim_index,
+    stim_label = .data$stim_label,
+    wavelength = as.character(.data$wavelength_protocol),
+    stim_nd = .data$stim_nd_protocol,
+    amp_mv = .data$response,
+    awave_mv = .data$awave,
+    dwave_mv = .data$dwave,
+    peak_time_poststim_ms = .data$peaktime,
+    trough_time_poststim_ms = .data$troughtime,
+    dpeak_time_poststim_ms = .data$dpeakime
+  )
+
+zeus_stats_summary <- zeus_summarize_peak_statistics(zeus_obj)
+origin_stats_summary <- zeus_summarize_peak_statistics(origin_irrad_for_stats)
+
+stats_compare <- zeus_stats_summary$combined_export |>
+  dplyr::rename_with(~ paste0("zeus_", .x), c(
+    "n", "mean_peak_mv", "sd_peak_mv", "sem_peak_mv", "median_peak_mv",
+    "min_peak_mv", "max_peak_mv", "mean_latency_ms", "sd_latency_ms"
+  )) |>
+  dplyr::inner_join(
+    origin_stats_summary$combined_export |>
+      dplyr::rename_with(~ paste0("origin_", .x), c(
+        "n", "mean_peak_mv", "sd_peak_mv", "sem_peak_mv", "median_peak_mv",
+        "min_peak_mv", "max_peak_mv", "mean_latency_ms", "sd_latency_ms"
+      )),
+    by = c("summary_type", "protocol_id", "grouping_variable", "grouping_value", "peak_type", "wavelength", "stim_nd")
+  )
+
+cat(sprintf("  Matched summary-stat rows: %d\n", nrow(stats_compare)))
+
+if (nrow(stats_compare) > 0L) {
+  summarise_agreement(stats_compare, "zeus_mean_peak_mv", "origin_mean_peak_mv", "Summary mean peak")
+  summarise_agreement(stats_compare, "zeus_sd_peak_mv", "origin_sd_peak_mv", "Summary SD peak")
+  summarise_agreement(stats_compare, "zeus_mean_latency_ms", "origin_mean_latency_ms", "Summary mean latency")
+}
+
+# ------------------------------------------------------------------------------
+# 9. Summary
 # ------------------------------------------------------------------------------
 
 cat("\n== C1 Validation Summary ==\n")
@@ -316,7 +460,13 @@ results_c1 <- list(
   sweep_compare    = sweep_compare,
   origin_long      = origin_long,
   traces_70        = traces_70,
-  wave_compare     = wave_compare
+  wave_compare     = wave_compare,
+  origin_irrad     = origin_irrad,
+  zeus_irrad       = zeus_irrad,
+  irrad_compare    = irrad_compare,
+  zeus_stats_summary = zeus_stats_summary,
+  origin_stats_summary = origin_stats_summary,
+  stats_compare    = stats_compare
 )
 
 cat("\nDone. Results stored in 'results_c1'.\n")

@@ -151,6 +151,7 @@ nd_to_log_irradiance <- function(meta, calib) {
 measure_trace_window <- function(trace_df,
                                  baseline_window_ms = NULL,
                                  response_window_ms = NULL,
+                                 awave_window_ms = NULL,
                                  stimulus_onset_ms = 400,
                                  time_reference = c("absolute", "stimulus"),
                                  trough_search_window_ms = NULL,
@@ -192,6 +193,10 @@ measure_trace_window <- function(trace_df,
     response_window_ms <- if (use_relative) c(0, 300) else c(400, 700)
   }
 
+  if (is.null(awave_window_ms)) {
+    awave_window_ms <- if (use_relative) c(0, 300) else c(400, 700)
+  }
+
   if (is.null(trough_search_window_ms)) {
     trough_search_window_ms <- response_window_ms
   }
@@ -201,7 +206,7 @@ measure_trace_window <- function(trace_df,
   }
 
   if (is.null(dwave_baseline_window_ms)) {
-    dwave_baseline_window_ms <- if (use_relative) c(250, 300) else c(650, 700)
+    dwave_baseline_window_ms <- baseline_window_ms
   }
 
   if (is.null(dwave_window_ms)) {
@@ -228,7 +233,13 @@ measure_trace_window <- function(trace_df,
       .data[[time_col]] <= response_window_ms[2]
     )
 
-  if (nrow(base_df) == 0L || nrow(resp_df) == 0L) {
+  awave_df <- trace_df |>
+    dplyr::filter(
+      .data[[time_col]] >= awave_window_ms[1],
+      .data[[time_col]] <= awave_window_ms[2]
+    )
+
+  if (nrow(base_df) == 0L || nrow(resp_df) == 0L || nrow(awave_df) == 0L) {
     return(tibble::tibble(
       baseline_mv = NA_real_,
       noise_pp_mv = NA_real_,
@@ -268,7 +279,10 @@ measure_trace_window <- function(trace_df,
     ) |>
     dplyr::arrange(.data[[time_col]])
 
-  if (nrow(trough_candidates) == 0L || nrow(peak_candidates) == 0L) {
+  awave_candidates <- awave_df |>
+    dplyr::arrange(.data[[time_col]])
+
+  if (nrow(trough_candidates) == 0L || nrow(peak_candidates) == 0L || nrow(awave_candidates) == 0L) {
     return(tibble::tibble(
       baseline_mv = baseline_mv,
       noise_pp_mv = noise_pp_mv,
@@ -295,8 +309,12 @@ measure_trace_window <- function(trace_df,
   peak_row <- peak_candidates |>
     dplyr::slice_max(order_by = .data$value, n = 1, with_ties = FALSE)
 
+  awave_row <- awave_candidates |>
+    dplyr::slice_min(order_by = .data$value, n = 1, with_ties = FALSE)
+
   min_val <- trough_row$value[[1]]
   max_val <- peak_row$value[[1]]
+  awave_min_val <- awave_row$value[[1]]
   trough_time_current <- trough_row[[time_col]][[1]]
   peak_time_current <- peak_row[[time_col]][[1]]
 
@@ -306,20 +324,13 @@ measure_trace_window <- function(trace_df,
     (min_val - max_val) + noise_pp_mv
   }
 
-  awave_mv <- min_val + noise_pp_mv
+  awave_mv <- awave_min_val + noise_pp_mv
 
   dwave_base_df <- trace_df |>
     dplyr::filter(
       .data[[time_col]] >= dwave_baseline_window_ms[1],
       .data[[time_col]] <= dwave_baseline_window_ms[2]
     )
-
-  dtrough_candidates <- trace_df |>
-    dplyr::filter(
-      .data[[time_col]] >= dwave_trough_search_window_ms[1],
-      .data[[time_col]] <= dwave_trough_search_window_ms[2]
-    ) |>
-    dplyr::arrange(.data[[time_col]])
 
   dpeak_candidates <- trace_df |>
     dplyr::filter(
@@ -330,26 +341,36 @@ measure_trace_window <- function(trace_df,
 
   if (nrow(dwave_base_df) > 0L && nrow(dpeak_candidates) > 0L) {
     dwave_baseline_mv <- mean(dwave_base_df$value, na.rm = TRUE)
-
+    dwave_noise_pp_mv <- max(dwave_base_df$value, na.rm = TRUE) -
+      min(dwave_base_df$value, na.rm = TRUE)
     dpeak_row <- dpeak_candidates |>
       dplyr::slice_max(order_by = .data$value, n = 1, with_ties = FALSE)
 
     dpeak_val <- dpeak_row$value[[1]]
     dpeak_time_current <- dpeak_row[[time_col]][[1]]
-    dwave_mv <- dpeak_val - dwave_baseline_mv
+
+    dtrough_candidates <- trace_df |>
+      dplyr::filter(
+        .data[[time_col]] >= dwave_window_ms[1],
+        .data[[time_col]] <= dpeak_time_current
+      ) |>
+      dplyr::arrange(.data[[time_col]])
+
+    if (nrow(dtrough_candidates) > 0L) {
+      dtrough_row <- dtrough_candidates |>
+        dplyr::slice_min(order_by = .data$value, n = 1, with_ties = FALSE)
+      dtrough_val <- dtrough_row$value[[1]]
+      dtrough_time_current <- dtrough_row[[time_col]][[1]]
+      dwave_mv <- (dpeak_val - dtrough_val) - dwave_noise_pp_mv
+    } else {
+      dtrough_time_current <- NA_real_
+      dwave_mv <- NA_real_
+    }
   } else {
     dwave_baseline_mv <- NA_real_
     dpeak_time_current <- NA_real_
-    dwave_mv <- NA_real_
-  }
-
-  if (nrow(dtrough_candidates) > 0L) {
-    dtrough_row <- dtrough_candidates |>
-      dplyr::slice_min(order_by = .data$value, n = 1, with_ties = FALSE)
-
-    dtrough_time_current <- dtrough_row[[time_col]][[1]]
-  } else {
     dtrough_time_current <- NA_real_
+    dwave_mv <- NA_real_
   }
 
   tibble::tibble(
@@ -367,8 +388,8 @@ measure_trace_window <- function(trace_df,
     dwave_mv = dwave_mv,
     dtrough_time_ms = dtrough_time_current,
     dpeak_time_ms = dpeak_time_current,
-    dtrough_time_poststim_ms = if (use_relative) dtrough_time_current else dtrough_time_current - stimulus_onset_ms,
-    dpeak_time_poststim_ms = if (use_relative) dpeak_time_current else dpeak_time_current - stimulus_onset_ms
+    dtrough_time_poststim_ms = if (use_relative) dtrough_time_current else dtrough_time_current - dwave_window_ms[1],
+    dpeak_time_poststim_ms = if (use_relative) dpeak_time_current else dpeak_time_current - dwave_window_ms[1]
   )
 }
 
@@ -408,6 +429,7 @@ extract_irrad_wl_amp <- function(x,
                                  calib = NULL,
                                  baseline_window_ms = NULL,
                                  response_window_ms = NULL,
+                                 awave_window_ms = NULL,
                                  stimulus_onset_ms = 400,
                                  same_sign = TRUE,
                                  time_reference = c("absolute", "stimulus"),
@@ -441,6 +463,7 @@ extract_irrad_wl_amp <- function(x,
       trace_df = .x,
       baseline_window_ms = baseline_window_ms,
       response_window_ms = response_window_ms,
+      awave_window_ms = awave_window_ms,
       stimulus_onset_ms = stimulus_onset_ms,
       time_reference = time_reference,
       trough_search_window_ms = trough_search_window_ms,
