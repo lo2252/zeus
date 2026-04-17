@@ -303,7 +303,7 @@
 #' @param erg_range Numeric. Total Y range of the ERG signal (used for
 #'   scaling).
 #' @param photocell_relative_height Fraction of `erg_range` that the photocell
-#'   pulse should occupy. Default is `0.20`.
+#'   pulse should occupy. Default is `1.1`.
 #'
 #' @return A data frame with `time_ms` and `signal` columns ready to overlay
 #'   on a plot, or `NULL` if no valid photocell data could be prepared.
@@ -313,7 +313,7 @@
     photocell_filter = "Photocell",
     erg_ymin,
     erg_range,
-    photocell_relative_height = 0.20
+    photocell_relative_height = 1.1
 ) {
   if (is.null(df_photocell_source) || !is.data.frame(df_photocell_source)) {
     return(NULL)
@@ -370,13 +370,65 @@
   }
 
   # Target: photocell occupies photocell_relative_height * erg_range in Y.
-  # Baseline is positioned slightly below erg_ymin (5 % gap).
+  # Baseline is positioned slightly below erg_ymin (0.1 % gap).
   target_height <- photocell_relative_height * erg_range
-  pc_baseline   <- erg_ymin - 0.05 * erg_range
+  pc_baseline   <- erg_ymin - 0.001 * erg_range
 
   pc |>
     dplyr::mutate(
       signal = ((signal - pc_min) / pc_range) * target_height + pc_baseline
+    )
+}
+
+.zeus_waveform_palette <- function(n) {
+  n <- max(1L, as.integer(n))
+
+  grDevices::colorRampPalette(
+    c("#DCEAF7", "#A9CBE3", "#5E94BF", "#245C8A", "#0E3254")
+  )(n)
+}
+
+.zeus_waveform_theme <- function(base_size = 12) {
+  ggplot2::theme_classic(base_size = base_size) +
+    ggplot2::theme(
+      plot.title = ggplot2::element_text(
+        face = "bold",
+        hjust = 0.5,
+        size = ggplot2::rel(1.28),
+        colour = "#0E3254",
+        margin = ggplot2::margin(b = 12)
+      ),
+      axis.title = ggplot2::element_text(
+        face = "bold",
+        colour = "#1F2A33"
+      ),
+      axis.text = ggplot2::element_text(
+        colour = "#33424D"
+      ),
+      legend.title = ggplot2::element_text(
+        face = "bold",
+        colour = "#1F2A33"
+      ),
+      legend.text = ggplot2::element_text(
+        size = ggplot2::rel(0.88),
+        colour = "#33424D"
+      ),
+      legend.position = "right",
+      legend.box = "vertical",
+      legend.spacing.y = grid::unit(0.18, "cm"),
+      legend.key.width = grid::unit(1.2, "cm"),
+      legend.key.height = grid::unit(0.45, "cm"),
+      legend.background = ggplot2::element_rect(fill = "white", color = "#D5DEE7", linewidth = 0.3),
+      legend.margin = ggplot2::margin(6, 6, 6, 6),
+      panel.border = ggplot2::element_blank(),
+      panel.grid.major.y = ggplot2::element_line(linewidth = 0.3, colour = "#DDE5EC"),
+      panel.grid.minor.y = ggplot2::element_line(linewidth = 0.2, colour = "#EEF3F7"),
+      panel.grid.major.x = ggplot2::element_blank(),
+      panel.grid.minor.x = ggplot2::element_blank(),
+      axis.line = ggplot2::element_line(linewidth = 0.5, color = "#2A3741"),
+      axis.ticks = ggplot2::element_line(linewidth = 0.4, color = "#2A3741"),
+      plot.background = ggplot2::element_rect(fill = "white", color = NA),
+      panel.background = ggplot2::element_rect(fill = "white", color = NA)
     )
 }
 
@@ -432,7 +484,7 @@
 #'   below the minimum ERG value.
 #' @param photocell_relative_height Fraction of the ERG amplitude range that
 #'   the photocell pulse should occupy when `photocell_auto_scale = TRUE`.
-#'   Default is `0.20` (20% of the ERG range).
+#'   Default is `1.1` (110% of the ERG range).
 #' @param a_window Numeric length-2 vector giving the A-wave search interval in
 #'   milliseconds.
 #' @param b_window Numeric length-2 vector giving the B-wave search interval in
@@ -463,7 +515,7 @@ zeus_plot_mean_waveform <- function(
     photocell_filter = "Photocell",
     photocell_color = "black",
     photocell_auto_scale = TRUE,
-    photocell_relative_height = 0.20,
+    photocell_relative_height = 1.1,
     a_window = c(400, 700),
     b_window = c(400, 700),
     d_window = c(700, 1000),
@@ -528,13 +580,9 @@ zeus_plot_mean_waveform <- function(
       color_group = factor(.data$color_group, levels = stim_levels_chr)
     )
 
-  # Publication-quality sequential palette:
-  # highest ND (dimmest stimulus) → lightest blue;
-  # lowest  ND (brightest stimulus) → darkest navy.
-  nd_palette_fn <- grDevices::colorRampPalette(
-    c("#C6DBEF", "#9ECAE1", "#6BAED6", "#3182BD", "#08519C", "#08306B")
-  )
-  plot_colors <- nd_palette_fn(length(stim_levels_chr))
+  # Sequential palette:
+
+  plot_colors <- .zeus_waveform_palette(length(stim_levels_chr))
   names(plot_colors) <- stim_levels_chr
 
   # Aggregate plotted data
@@ -656,7 +704,7 @@ zeus_plot_mean_waveform <- function(
           alpha = .data$signal_type,
           group = interaction(.data$color_group, .data$signal_type)
         ),
-        linewidth = 0.55,
+        linewidth = 0.45,
         lineend = "round"
       ) +
       ggplot2::scale_alpha_manual(
@@ -674,7 +722,7 @@ zeus_plot_mean_waveform <- function(
           color = .data$color_group,
           group = .data$color_group
         ),
-        linewidth = 0.60,
+        linewidth = 0.50,
         alpha = 0.95,
         lineend = "round"
       )
@@ -714,12 +762,14 @@ zeus_plot_mean_waveform <- function(
     p <- p +
       ggplot2::geom_line(
         data = df_photocell,
-        ggplot2::aes(x = .data$time_ms, y = .data$signal),
-        color = photocell_color,
-        linewidth = 0.5,
+        ggplot2::aes(
+          x = .data$time_ms,
+          y = .data$signal,
+          color = "Photocell"
+        ),
+        linewidth = 0.30,
         alpha = 0.95,
         inherit.aes = FALSE,
-        show.legend = FALSE,
         lineend = "round"
       )
   }
@@ -853,8 +903,18 @@ zeus_plot_mean_waveform <- function(
   }
 
   # Final formatting
-  color_values <- c(plot_colors, "Overall Mean" = overall_color)
-  color_breaks <- c(stim_levels_chr, if (isTRUE(include_overall)) "Overall Mean")
+  color_values <- c(plot_colors)
+  color_breaks <- stim_levels_chr
+
+  if (isTRUE(include_overall)) {
+    color_values <- c(color_values, "Overall Mean" = overall_color)
+    color_breaks <- c(color_breaks, "Overall Mean")
+  }
+
+  if (!is.null(df_photocell)) {
+    color_values <- c(color_values, "Photocell" = photocell_color)
+    color_breaks <- c(color_breaks, "Photocell")
+  }
 
   p +
     ggplot2::scale_color_manual(
@@ -864,15 +924,10 @@ zeus_plot_mean_waveform <- function(
     ) +
     ggplot2::guides(
       color = ggplot2::guide_legend(
-        title = switch(
-          color_by,
-          stim_label = "Stimulus",
-          stim_nd = "Stimulus ND",
-          wavelength = "Wavelength"
-        ),
+        title = "Trace Key",
         order = 1,
         override.aes = list(
-          linewidth = c(rep(1.1, length(color_breaks) - 1), 1.6),
+          linewidth = rep(1.35, length(color_breaks)),
           alpha = 1,
           linetype = "solid"
         )
@@ -896,7 +951,8 @@ zeus_plot_mean_waveform <- function(
       expand = ggplot2::expansion(mult = c(0.01, 0.03))
     ) +
     ggplot2::scale_y_continuous(
-      breaks = scales::pretty_breaks(n = 6),
+      breaks = scales::pretty_breaks(n = 8),
+      minor_breaks = function(lims, ...) scales::pretty_breaks(n = 14)(lims),
       expand = ggplot2::expansion(mult = c(0.03, 0.08))
     ) +
     ggplot2::labs(
@@ -904,29 +960,7 @@ zeus_plot_mean_waveform <- function(
       x = "Time (ms)",
       y = expression("Response (" * mu * "V)")
     ) +
-    ggplot2::theme_classic(base_size = base_size) +
-    ggplot2::theme(
-      plot.title = ggplot2::element_text(
-        face = "bold",
-        hjust = 0.5,
-        size = ggplot2::rel(1.1),
-        margin = ggplot2::margin(b = 10)
-      ),
-      axis.title = ggplot2::element_text(face = "bold"),
-      axis.text  = ggplot2::element_text(color = "black"),
-      legend.title      = ggplot2::element_text(face = "bold"),
-      legend.text       = ggplot2::element_text(size = ggplot2::rel(0.85)),
-      legend.position   = "right",
-      legend.box        = "vertical",
-      legend.spacing.y  = grid::unit(0.2, "cm"),
-      legend.key.width  = grid::unit(1.0, "cm"),
-      legend.key.height = grid::unit(0.4, "cm"),
-      panel.border      = ggplot2::element_blank(),
-      axis.line  = ggplot2::element_line(linewidth = 0.5, color = "black"),
-      axis.ticks = ggplot2::element_line(linewidth = 0.4, color = "black"),
-      plot.background   = ggplot2::element_rect(fill = "white", color = NA),
-      panel.background  = ggplot2::element_rect(fill = "white", color = NA)
-    )
+    .zeus_waveform_theme(base_size = base_size)
 }
 
 
@@ -1151,7 +1185,7 @@ zeus_plot_spectral_waveform <- function(
     include_photocell = TRUE,
     photocell_filter = "Photocell",
     photocell_color = "black",
-    photocell_relative_height = 0.20,
+    photocell_relative_height = 1.1,
     protocol_label = NULL,
     file_label = NULL,
     facet_ncol = 5L,
@@ -1171,35 +1205,12 @@ zeus_plot_spectral_waveform <- function(
   df_plot              <- prepared$df_plot
   df_photocell_source  <- prepared$df_photocell_source
 
-  # Auto-detect protocol and filename from a zeus_stimresp object.
-  if (inherits(x, "zeus_stimresp")) {
-    if (is.null(protocol_label) && !is.null(x$protocol)) {
-      protocol_label <- x$protocol
-    }
-    if (is.null(file_label) && !is.null(x$path)) {
-      file_label <- tools::file_path_sans_ext(basename(x$path))
-    }
-  }
-
   if (!("stim_label" %in% names(df_plot))) {
     stop("`x` must contain `stim_label`.", call. = FALSE)
   }
 
   if (!("stim_nd" %in% names(df_plot))) {
     stop("`x` must contain `stim_nd`.", call. = FALSE)
-  }
-
-  # Internal helper: build the second line of the strip label for a single
-  # block.  Returns a string of the form "Block N | C0 | filename", omitting
-  # any component that is NA / NULL.
-  .make_block_sublabel <- function(block_idx, proto, fname) {
-    parts <- character(0)
-    if (!is.null(block_idx) && !is.na(block_idx)) {
-      parts <- c(parts, paste0("Block ", block_idx))
-    }
-    if (!is.null(proto) && nzchar(proto)) parts <- c(parts, proto)
-    if (!is.null(fname)  && nzchar(fname))  parts <- c(parts, fname)
-    paste(parts, collapse = " | ")  # ASCII separator: "Block N | C0 | filename"
   }
 
   # Extract the wavelength prefix: first non-whitespace token of stim_label.
@@ -1218,32 +1229,11 @@ zeus_plot_spectral_waveform <- function(
       prefix_block_map <- df_plot |>
         dplyr::distinct(.data$.wl_prefix, .data$block_index) |>
         dplyr::arrange(.data$block_index)
-
-      # Build compound label: line 1 = wavelength; line 2 = Block N | proto | file
-      compound_labels <- vapply(
-        seq_len(nrow(prefix_block_map)),
-        function(i) {
-          sub_lbl <- .make_block_sublabel(
-            prefix_block_map$block_index[[i]], protocol_label, file_label
-          )
-          if (nzchar(sub_lbl)) {
-            paste0(prefix_block_map$.wl_prefix[[i]], "\n", sub_lbl)
-          } else {
-            prefix_block_map$.wl_prefix[[i]]
-          }
-        },
-        character(1L)
-      )
+      compound_labels <- prefix_block_map$.wl_prefix
       names(compound_labels) <- prefix_block_map$.wl_prefix
       label_order <- prefix_block_map$.wl_prefix
     } else {
-      # No block_index: just append proto / file as a second line when available.
-      sub_lbl <- .make_block_sublabel(NULL, protocol_label, file_label)
-      compound_labels <- vapply(
-        unique_prefixes,
-        function(p) if (nzchar(sub_lbl)) paste0(p, "\n", sub_lbl) else p,
-        character(1L)
-      )
+      compound_labels <- unique_prefixes
       names(compound_labels) <- unique_prefixes
       label_order <- unique_prefixes
     }
@@ -1256,7 +1246,8 @@ zeus_plot_spectral_waveform <- function(
         )
       )
   } else {
-    # C1-like: single wavelength prefix, use block_index to create per-block facets.
+    # C1-like: single wavelength prefix, keep labels concise while still
+    # distinguishing repeated runs.
     if (!("block_index" %in% names(df_plot))) {
       stop(
         "Cannot determine facet panels: `block_index` column is required ",
@@ -1265,11 +1256,11 @@ zeus_plot_spectral_waveform <- function(
       )
     }
     block_order <- sort(unique(df_plot$block_index))
+    wl_label <- unique_prefixes[[1]]
 
-    # Build label per block: "Block N | C1 | filename"
     block_label_vec <- vapply(
       block_order,
-      function(b) .make_block_sublabel(b, protocol_label, file_label),
+      function(b) paste0(wl_label, " Run ", b),
       character(1L)
     )
     names(block_label_vec) <- as.character(block_order)
@@ -1306,10 +1297,7 @@ zeus_plot_spectral_waveform <- function(
   # highest ND (dimmest stimulus) → lightest blue;
   # lowest  ND (brightest stimulus) → darkest navy.
   n_nd <- length(nd_levels_chr)
-  nd_palette_fn <- grDevices::colorRampPalette(
-    c("#C6DBEF", "#9ECAE1", "#6BAED6", "#3182BD", "#08519C", "#08306B")
-  )
-  plot_colors <- stats::setNames(nd_palette_fn(n_nd), nd_levels_chr)
+  plot_colors <- stats::setNames(.zeus_waveform_palette(n_nd), nd_levels_chr)
 
   # Photocell — scale once globally, then replicate across all panels.
   df_photocell_panels <- NULL
@@ -1363,33 +1351,41 @@ zeus_plot_spectral_waveform <- function(
       group = .data$nd_group
     )
   ) +
-    ggplot2::geom_line(linewidth = 0.55, lineend = "round", alpha = 0.95) +
+    ggplot2::geom_line(linewidth = 0.45, lineend = "round", alpha = 0.95) +
     facet_layer
 
   if (!is.null(df_photocell_panels)) {
     p <- p +
       ggplot2::geom_line(
         data = df_photocell_panels,
-        ggplot2::aes(x = .data$time_ms, y = .data$signal),
-        color       = photocell_color,
-        linewidth   = 0.45,
+        ggplot2::aes(
+          x = .data$time_ms,
+          y = .data$signal,
+          color = "Photocell"
+        ),
+        linewidth   = 0.28,
         alpha       = 0.85,
         inherit.aes = FALSE,
-        show.legend = FALSE,
         lineend     = "round"
       )
   }
 
+  color_values <- plot_colors
+  if (!is.null(df_photocell_panels)) {
+    color_values <- c(color_values, "Photocell" = photocell_color)
+  }
+
   p +
     ggplot2::scale_color_manual(
-      values = plot_colors,
-      name   = "Stimulus ND",
+      values = color_values,
+      name   = "Trace Key",
       drop   = FALSE
     ) +
     ggplot2::guides(
       color = ggplot2::guide_legend(
-        title = "Stimulus ND",
-        override.aes = list(linewidth = 1.2, alpha = 1)
+        title = "Trace Key",
+        override.aes = list(linewidth = 1.2, alpha = 1),
+        order = 1
       )
     ) +
     ggplot2::scale_x_continuous(
@@ -1397,7 +1393,8 @@ zeus_plot_spectral_waveform <- function(
       expand = ggplot2::expansion(mult = c(0.01, 0.03))
     ) +
     ggplot2::scale_y_continuous(
-      breaks = scales::pretty_breaks(n = 4),
+      breaks = scales::pretty_breaks(n = 8),
+      minor_breaks = function(lims, ...) scales::pretty_breaks(n = 14)(lims),
       expand = ggplot2::expansion(mult = c(0.05, 0.08))
     ) +
     ggplot2::labs(
@@ -1405,28 +1402,16 @@ zeus_plot_spectral_waveform <- function(
       x     = "Time (ms)",
       y     = expression("Response (" * mu * "V)")
     ) +
-    ggplot2::theme_classic(base_size = base_size) +
+    .zeus_waveform_theme(base_size = base_size) +
     ggplot2::theme(
-      plot.title = ggplot2::element_text(
-        face   = "bold",
-        hjust  = 0.5,
-        size   = ggplot2::rel(1.1),
-        margin = ggplot2::margin(b = 8)
+      strip.background = ggplot2::element_rect(fill = "#F3F6F8", color = "#C7D3DD", linewidth = 0.5),
+      strip.text = ggplot2::element_text(
+        face = "bold",
+        size = ggplot2::rel(0.92),
+        colour = "#1F2A33",
+        lineheight = 0.98
       ),
-      axis.title       = ggplot2::element_text(face = "bold"),
-      axis.text        = ggplot2::element_text(color = "black", size = ggplot2::rel(0.8)),
-      legend.title     = ggplot2::element_text(face = "bold"),
-      legend.text      = ggplot2::element_text(size = ggplot2::rel(0.85)),
-      legend.position  = "right",
-      legend.key.width  = grid::unit(1.0, "cm"),
-      legend.key.height = grid::unit(0.4, "cm"),
-      strip.background = ggplot2::element_blank(),
-      strip.text       = ggplot2::element_text(face = "bold", size = ggplot2::rel(0.95)),
-      panel.spacing.x  = grid::unit(0.6, "lines"),
-      panel.spacing.y  = grid::unit(0.8, "lines"),
-      axis.line        = ggplot2::element_line(linewidth = 0.45, color = "black"),
-      axis.ticks       = ggplot2::element_line(linewidth = 0.35, color = "black"),
-      plot.background  = ggplot2::element_rect(fill = "white", color = NA),
-      panel.background = ggplot2::element_rect(fill = "white", color = NA)
+      panel.spacing.x = grid::unit(0.6, "lines"),
+      panel.spacing.y = grid::unit(0.8, "lines")
     )
 }
