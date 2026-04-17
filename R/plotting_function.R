@@ -383,9 +383,7 @@
 .zeus_waveform_palette <- function(n) {
   n <- max(1L, as.integer(n))
 
-  grDevices::colorRampPalette(
-    c("#DCEAF7", "#A9CBE3", "#5E94BF", "#245C8A", "#0E3254")
-  )(n)
+  grDevices::hcl.colors(n, palette = "Dark 3")
 }
 
 .zeus_waveform_theme <- function(base_size = 12) {
@@ -958,7 +956,7 @@ zeus_plot_mean_waveform <- function(
     ggplot2::labs(
       title = "Mean ERG Waveform",
       x = "Time (ms)",
-      y = expression("Response (" * mu * "V)")
+      y = "Response (\u00B5V)"
     ) +
     .zeus_waveform_theme(base_size = base_size)
 }
@@ -1097,7 +1095,7 @@ zeus_plot_intensity_response <- function(
     ggplot2::scale_x_reverse() +
     ggplot2::labs(
       x = "Stimulus ND",
-      y = expression("Response (" * mu * "V)"),
+      y = "Response (\u00B5V)",
       title = "Wave Intensity Response",
       color = if (!is.null(group_col)) group_col else NULL
     ) +
@@ -1400,7 +1398,7 @@ zeus_plot_spectral_waveform <- function(
     ggplot2::labs(
       title = "Spectral ERG Waveforms by Wavelength Block",
       x     = "Time (ms)",
-      y     = expression("Response (" * mu * "V)")
+      y     = "Response (\u00B5V)"
     ) +
     .zeus_waveform_theme(base_size = base_size) +
     ggplot2::theme(
