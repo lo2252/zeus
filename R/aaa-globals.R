@@ -1,4 +1,5 @@
 #' @importFrom rlang .data
+#' @importFrom stats ave
 NULL
 
 utils::globalVariables(c(
