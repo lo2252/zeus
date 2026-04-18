@@ -8,7 +8,7 @@
 #'
 #' Supported components are:
 #' `raw`, `traces_280`, `traces_70`, `photocell`, `stimresp_qc`,
-#' and `stimresp_settings`.
+#' `stimresp_settings`, and `peak_statistics`.
 #'
 #' For `raw`, objects of class `ABF` or `zeus_abf_raw` are converted to ZEUS
 #' long format with [abf_as_df_long()] before export.
@@ -34,10 +34,20 @@ zeus_export_csv_bundle <- function(x, csv_path) {
     "traces_70",
     "photocell",
     "stimresp_qc",
-    "stimresp_settings"
+    "stimresp_settings",
+    "peak_statistics"
   )
 
   present_names <- intersect(names(x), supported_names)
+
+  if (!("peak_statistics" %in% present_names)) {
+    auto_peak_statistics <- zeus_prepare_peak_statistics_export(x)
+
+    if (!is.null(auto_peak_statistics)) {
+      x[["peak_statistics"]] <- auto_peak_statistics
+      present_names <- c(present_names, "peak_statistics")
+    }
+  }
 
   if (length(present_names) == 0L) {
     stop(
@@ -64,6 +74,24 @@ zeus_export_csv_bundle <- function(x, csv_path) {
   }
 
   invisible(written_paths)
+}
+
+#' Prepare combined peak statistics for CSV export
+#'
+#' @param x Object to export.
+#'
+#' @return A data frame or `NULL` when no statistics export can be derived.
+#' @keywords internal
+zeus_prepare_peak_statistics_export <- function(x) {
+  if (is.list(x) && "peak_statistics" %in% names(x) && is.data.frame(x$peak_statistics)) {
+    return(x$peak_statistics)
+  }
+
+  if (inherits(x, "zeus_stimresp") || inherits(x, "zeus_abf")) {
+    return(zeus_summarize_peak_statistics(x)$combined_export)
+  }
+
+  NULL
 }
 
 #' Prepare one ZEUS component for CSV export

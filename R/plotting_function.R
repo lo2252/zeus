@@ -393,15 +393,17 @@
         face = "bold",
         hjust = 0.5,
         size = ggplot2::rel(1.28),
-        colour = "#0E3254",
+        colour = "#1F2A33",
         margin = ggplot2::margin(b = 12)
       ),
       axis.title = ggplot2::element_text(
         face = "bold",
+        size = ggplot2::rel(0.80),
         colour = "#1F2A33"
       ),
       axis.text = ggplot2::element_text(
-        colour = "#33424D"
+        size = ggplot2::rel(0.82),
+        colour = "#1F2A33"
       ),
       legend.title = ggplot2::element_text(
         face = "bold",
@@ -409,7 +411,7 @@
       ),
       legend.text = ggplot2::element_text(
         size = ggplot2::rel(0.88),
-        colour = "#33424D"
+        colour = "#1F2A33"
       ),
       legend.position = "right",
       legend.box = "vertical",
@@ -489,6 +491,11 @@
 #'   milliseconds.
 #' @param d_window Numeric length-2 vector giving the D-wave search interval in
 #'   milliseconds.
+#' @param wavelength_select Optional character or numeric wavelength-block
+#'   selector for spectral C0 data. When supplied, the plot is filtered to the
+#'   matching stimulus-label prefix before averaging, so only the ND levels for
+#'   that wavelength block are shown. Examples include `"570"`, `"650A"`, and
+#'   `"650B"`. Default is `NULL`.
 #' @param stim_levels Optional vector giving the desired order of stimulus labels
 #'   in the legend. If `NULL`, uses the order present in the data.
 #' @param color_by One of `"stim_nd"`, `"stim_label"`, or `"wavelength"`.
@@ -517,6 +524,7 @@ zeus_plot_mean_waveform <- function(
     a_window = c(400, 700),
     b_window = c(400, 700),
     d_window = c(700, 1000),
+    wavelength_select = "450",
     stim_levels = NULL,
     color_by = c("stim_nd", "stim_label", "wavelength"),
     overall_color = "red",
@@ -525,6 +533,7 @@ zeus_plot_mean_waveform <- function(
 ) {
   data_slot <- match.arg(data_slot)
   color_by <- match.arg(color_by)
+  protocol_label <- NULL
 
   prepared <- .zeus_prepare_plot_df(
     x = x,
@@ -536,6 +545,15 @@ zeus_plot_mean_waveform <- function(
 
   df_plot <- prepared$df_plot
   df_photocell_source <- prepared$df_photocell_source
+
+  if (inherits(x, "zeus_stimresp") && !is.null(x$protocol)) {
+    protocol_label <- as.character(x$protocol)[1]
+  } else if ("protocol_id" %in% names(df_plot)) {
+    protocol_values <- unique(stats::na.omit(as.character(df_plot$protocol_id)))
+    if (length(protocol_values) == 1L) {
+      protocol_label <- protocol_values[[1]]
+    }
+  }
 
   if (!("stim_label" %in% names(df_plot))) {
     if ("stim_nd" %in% names(df_plot)) {
@@ -554,6 +572,46 @@ zeus_plot_mean_waveform <- function(
       "`compare_raw = TRUE` requires a `value_raw` column in the plotted data.",
       call. = FALSE
     )
+  }
+
+  if (!is.null(wavelength_select)) {
+    wavelength_select <- as.character(wavelength_select)[1]
+
+    stim_prefix <- stringr::str_extract(as.character(df_plot$stim_label), "^\\S+")
+    available_prefixes <- unique(stats::na.omit(stim_prefix))
+
+    if (!(wavelength_select %in% available_prefixes)) {
+      stop(
+        "`wavelength_select` must match one of: ",
+        paste(available_prefixes, collapse = ", "),
+        call. = FALSE
+      )
+    }
+
+    df_plot <- df_plot |>
+      dplyr::mutate(.wl_prefix = stim_prefix) |>
+      dplyr::filter(.data$.wl_prefix == wavelength_select) |>
+      dplyr::select(-.data$.wl_prefix)
+
+    if (nrow(df_plot) == 0L) {
+      stop(
+        "No rows remain after applying `wavelength_select`.",
+        call. = FALSE
+      )
+    }
+  }
+
+  plot_title <- "Mean ERG Waveform"
+  y_axis_label <- "Response (\u00B5V)"
+
+  if (!is.null(wavelength_select)) {
+    plot_title <- paste0(plot_title, " - ", wavelength_select, " Waveform")
+    y_axis_label <- paste0("Response (\u00B5V) - ", wavelength_select, " Waveform")
+  }
+
+  legend_title <- "Trace Key"
+  if (!is.null(protocol_label) && nzchar(protocol_label)) {
+    legend_title <- paste0(protocol_label, " Trace Key")
   }
 
   # Legend grouping
@@ -922,10 +980,10 @@ zeus_plot_mean_waveform <- function(
     ) +
     ggplot2::guides(
       color = ggplot2::guide_legend(
-        title = "Trace Key",
+        title = legend_title,
         order = 1,
         override.aes = list(
-          linewidth = rep(1.35, length(color_breaks)),
+          linewidth = rep(1.15, length(color_breaks)),
           alpha = 1,
           linetype = "solid"
         )
@@ -954,11 +1012,19 @@ zeus_plot_mean_waveform <- function(
       expand = ggplot2::expansion(mult = c(0.03, 0.08))
     ) +
     ggplot2::labs(
-      title = "Mean ERG Waveform",
+      title = plot_title,
       x = "Time (ms)",
-      y = "Response (\u00B5V)"
+      y = y_axis_label
     ) +
-    .zeus_waveform_theme(base_size = base_size)
+    .zeus_waveform_theme(base_size = base_size) +
+    ggplot2::theme(
+      legend.key.width = grid::unit(1.0, "cm"),
+      legend.key.height = grid::unit(0.36, "cm"),
+      legend.spacing.y = grid::unit(0.12, "cm"),
+      legend.margin = ggplot2::margin(4, 4, 4, 4),
+      legend.text = ggplot2::element_text(size = ggplot2::rel(0.82)),
+      legend.title = ggplot2::element_text(size = ggplot2::rel(0.86))
+    )
 }
 
 
@@ -1101,14 +1167,17 @@ zeus_plot_intensity_response <- function(
     ) +
     ggplot2::theme_classic(base_size = base_size) +
     ggplot2::theme(
-      axis.title = ggplot2::element_text(face = "bold"),
+      axis.title = ggplot2::element_text(face = "bold", size = ggplot2::rel(0.80), colour = "#1F2A33"),
+      axis.text = ggplot2::element_text(size = ggplot2::rel(0.82), colour = "#1F2A33"),
       strip.background = ggplot2::element_blank(),
-      strip.text = ggplot2::element_text(face = "bold"),
-      legend.title = ggplot2::element_text(face = "bold"),
+      strip.text = ggplot2::element_text(face = "bold", colour = "#1F2A33"),
+      legend.title = ggplot2::element_text(face = "bold", colour = "#1F2A33"),
+      legend.text = ggplot2::element_text(colour = "#1F2A33"),
       legend.position = if (!is.null(group_col)) "right" else "none",
       plot.title = ggplot2::element_text(
         hjust = 0.5,
-        face = "bold"
+        face = "bold",
+        colour = "#1F2A33"
       ),
       axis.line = ggplot2::element_line(linewidth = 0.5),
       axis.ticks = ggplot2::element_line(linewidth = 0.4),
