@@ -1,0 +1,184 @@
+:root {
+  --zeus-cream: #f6f1e8;
+  --zeus-paper: #fffdf8;
+  --zeus-ink: #14253d;
+  --zeus-navy: #253b6f;
+  --zeus-crimson: #c42e4e;
+  --zeus-gold: #d9c58f;
+  --zeus-border: rgba(20, 37, 61, 0.12);
+  --zeus-shadow: 0 20px 45px rgba(20, 37, 61, 0.08);
+}
+
+body {
+  background:
+    radial-gradient(circle at top right, rgba(217, 197, 143, 0.18), transparent 34%),
+    linear-gradient(180deg, #fbf8f1 0%, var(--zeus-cream) 100%);
+  color: var(--zeus-ink);
+}
+
+.zeus-app-shell {
+  padding: 1.25rem 0 2rem;
+}
+
+.zeus-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1.25rem;
+  border: 1px solid var(--zeus-border);
+  border-radius: 24px;
+  background: linear-gradient(135deg, rgba(255, 253, 248, 0.98), rgba(245, 239, 227, 0.96));
+  box-shadow: var(--zeus-shadow);
+}
+
+.zeus-hero-brand {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+.zeus-logo {
+  width: 128px;
+  max-width: 100%;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.65);
+  box-shadow: 0 10px 24px rgba(20, 37, 61, 0.08);
+}
+
+.zeus-hero-copy h1 {
+  margin: 0;
+  color: var(--zeus-crimson);
+  font-family: "Palatino Linotype", "Book Antiqua", Palatino, serif;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.zeus-hero-copy p {
+  margin: 0.5rem 0 0;
+  max-width: 760px;
+  color: var(--zeus-ink);
+  font-size: 1rem;
+}
+
+.zeus-import-summary {
+  min-width: 250px;
+  padding: 0.85rem 1rem;
+  border-radius: 18px;
+  background: rgba(37, 59, 111, 0.06);
+  border: 1px solid rgba(37, 59, 111, 0.12);
+}
+
+.zeus-import-summary div {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.25rem;
+}
+
+.zeus-card,
+.sidebar {
+  border: 1px solid var(--zeus-border);
+  border-radius: 20px;
+  background: rgba(255, 253, 248, 0.95);
+  box-shadow: var(--zeus-shadow);
+}
+
+.sidebar {
+  background:
+    linear-gradient(180deg, rgba(255, 253, 248, 0.98), rgba(246, 241, 232, 0.96));
+}
+
+.zeus-sidebar-block {
+  margin-bottom: 1rem;
+}
+
+.btn-zeus-primary,
+.btn-zeus-secondary {
+  width: 100%;
+  border-radius: 999px;
+  border: none;
+  padding: 0.75rem 1rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.btn-zeus-primary {
+  background: linear-gradient(135deg, var(--zeus-crimson), #a51f40);
+  color: #fff;
+}
+
+.btn-zeus-secondary {
+  background: linear-gradient(135deg, var(--zeus-navy), #182b54);
+  color: #fff;
+}
+
+.nav-tabs {
+  border-bottom: none;
+  gap: 0.35rem;
+  margin-bottom: 1rem;
+}
+
+.nav-tabs > li > a {
+  border-radius: 999px;
+  color: var(--zeus-ink);
+  border: 1px solid transparent;
+  background: rgba(37, 59, 111, 0.06);
+}
+
+.nav-tabs > li.active > a,
+.nav-tabs > li > a:hover,
+.nav-tabs > li > a:focus {
+  background: #fff;
+  color: var(--zeus-crimson);
+  border-color: rgba(196, 46, 78, 0.2);
+}
+
+.card-header,
+.accordion-header .accordion-button {
+  font-family: "Palatino Linotype", "Book Antiqua", Palatino, serif;
+  font-weight: 700;
+  color: var(--zeus-ink);
+  background: transparent;
+}
+
+.accordion-item {
+  border: 1px solid var(--zeus-border);
+  border-radius: 16px;
+  overflow: hidden;
+  margin-bottom: 0.8rem;
+}
+
+.accordion-button:not(.collapsed) {
+  color: var(--zeus-crimson);
+  background: rgba(196, 46, 78, 0.05);
+  box-shadow: none;
+}
+
+.form-control,
+.selectize-input,
+.well {
+  border-radius: 14px;
+  border-color: rgba(20, 37, 61, 0.14);
+  box-shadow: none;
+}
+
+.dataTables_wrapper .dt-buttons .btn {
+  border-radius: 999px;
+  border: none;
+  background: rgba(37, 59, 111, 0.1);
+  color: var(--zeus-ink);
+}
+
+@media (max-width: 991px) {
+  .zeus-hero {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .zeus-hero-brand {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
