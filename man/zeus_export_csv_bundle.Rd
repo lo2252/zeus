@@ -21,7 +21,7 @@ ends in \code{.csv}, that extension is removed before suffixes are added.
 
 Supported components are:
 \code{raw}, \code{traces_280}, \code{traces_70}, \code{photocell}, \code{stimresp_qc},
-and \code{stimresp_settings}.
+\code{stimresp_settings}, and \code{peak_statistics}.
 
 For \code{raw}, objects of class \code{ABF} or \code{zeus_abf_raw} are converted to ZEUS
 long format with \code{\link[=abf_as_df_long]{abf_as_df_long()}} before export.

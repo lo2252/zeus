@@ -19,6 +19,7 @@ zeus_plot_mean_waveform(
   a_window = c(400, 700),
   b_window = c(400, 700),
   d_window = c(700, 1000),
+  wavelength_select = "450",
   stim_levels = NULL,
   color_by = c("stim_nd", "stim_label", "wavelength"),
   overall_color = "red",
@@ -71,6 +72,12 @@ milliseconds.}
 
 \item{d_window}{Numeric length-2 vector giving the D-wave search interval in
 milliseconds.}
+
+\item{wavelength_select}{Optional character or numeric wavelength-block
+selector for spectral C0 data. When supplied, the plot is filtered to the
+matching stimulus-label prefix before averaging, so only the ND levels for
+that wavelength block are shown. Examples include \code{"570"}, \code{"650A"}, and
+\code{"650B"}. Default is \code{NULL}.}
 
 \item{stim_levels}{Optional vector giving the desired order of stimulus labels
 in the legend. If \code{NULL}, uses the order present in the data.}
