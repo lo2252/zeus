@@ -4,13 +4,16 @@
 \alias{zeus_export_excel_workbook}
 \title{Export ZEUS data sources as an Excel workbook}
 \usage{
-zeus_export_excel_workbook(x, xlsx_path)
+zeus_export_excel_workbook(x, xlsx_path, components = NULL)
 }
 \arguments{
 \item{x}{A named list or ZEUS object containing one or more supported
 components.}
 
 \item{xlsx_path}{Output path for the \code{.xlsx} workbook.}
+
+\item{components}{Optional character vector of supported ZEUS components to
+include. Defaults to all supported components present in \code{x}.}
 }
 \value{
 Invisibly returns \code{xlsx_path}.

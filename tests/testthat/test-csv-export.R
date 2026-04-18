@@ -121,3 +121,33 @@ test_that("zeus_export_excel_workbook writes an xlsx file", {
   expect_true(file.exists(xlsx_path))
   expect_true(file.info(xlsx_path)$size > 0)
 })
+
+test_that("zeus_export_excel_workbook respects selected components", {
+  obj <- list(
+    traces_70 = data.frame(
+      stim_index = 1L,
+      stim_label = "White 3.0",
+      time_ms = 100,
+      value = 2.15
+    ),
+    stimresp_settings = list(
+      stimresp_zero_baseline = TRUE,
+      stimresp_baseline_window_ms = c(300, 400)
+    ),
+    peak_statistics = data.frame(
+      summary_type = "key_statistics",
+      protocol_id = "C1"
+    )
+  )
+
+  xlsx_path <- tempfile(fileext = ".xlsx")
+  out <- zeus_export_excel_workbook(
+    obj,
+    xlsx_path,
+    components = c("traces_70", "peak_statistics")
+  )
+
+  expect_equal(out, xlsx_path)
+  expect_true(file.exists(xlsx_path))
+  expect_true(file.info(xlsx_path)$size > 0)
+})

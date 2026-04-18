@@ -9,6 +9,7 @@ zeus_plot_spectral_waveform(
   data_slot = c("traces_70", "traces_280"),
   channel_filter = NULL,
   stim_levels = NULL,
+  wavelength_select = NULL,
   include_photocell = TRUE,
   photocell_filter = "Photocell",
   photocell_color = "black",
@@ -33,6 +34,10 @@ data slot has no \code{channel} column.}
 \item{stim_levels}{Optional numeric vector giving the desired ND levels to
 display and their legend order (highest = dimmest first).  If \code{NULL},
 all ND levels present in the data are used in descending order.}
+
+\item{wavelength_select}{Optional character string used to filter spectral
+plots to one wavelength block (for example \code{"570"} or \code{"650A"}). Use
+\code{NULL} to show all wavelength blocks. Ignored for single-wavelength data.}
 
 \item{include_photocell}{Logical; if \code{TRUE} (default), overlays the mean
 photocell trace on every panel when photocell data are available.}
