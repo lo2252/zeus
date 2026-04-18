@@ -33,6 +33,24 @@ test_that("zeus_export_csv_bundle writes one csv per supported component", {
       stimresp_zero_baseline = TRUE,
       stimresp_baseline_window_ms = c(300, 400),
       stimresp_runmean_k = 16L
+    ),
+    peak_statistics = data.frame(
+      summary_type = "key_statistics",
+      protocol_id = "C1",
+      grouping_variable = "overall",
+      grouping_value = NA_character_,
+      peak_type = "B-wave",
+      wavelength = NA_character_,
+      stim_nd = NA_real_,
+      n = 7L,
+      mean_peak_mv = 10.2,
+      sd_peak_mv = 0.9,
+      sem_peak_mv = 0.34,
+      median_peak_mv = 10.1,
+      min_peak_mv = 9.0,
+      max_peak_mv = 11.5,
+      mean_latency_ms = 120.0,
+      sd_latency_ms = 6.5
     )
   )
 
@@ -47,7 +65,8 @@ test_that("zeus_export_csv_bundle writes one csv per supported component", {
     traces_70 = paste0(base_path, "_traces_70.csv"),
     photocell = paste0(base_path, "_photocell.csv"),
     stimresp_qc = paste0(base_path, "_stimresp_qc.csv"),
-    stimresp_settings = paste0(base_path, "_stimresp_settings.csv")
+    stimresp_settings = paste0(base_path, "_stimresp_settings.csv"),
+    peak_statistics = paste0(base_path, "_peak_statistics.csv")
   )
 
   expect_equal(unname(written), unname(expected))
@@ -65,4 +84,18 @@ test_that("zeus_export_csv_bundle writes one csv per supported component", {
     "stimresp_baseline_window_ms_2",
     "stimresp_runmean_k"
   ) %in% names(settings_export)))
+
+  peak_statistics_export <- utils::read.csv(
+    expected[["peak_statistics"]],
+    stringsAsFactors = FALSE
+  )
+
+  expect_true(nrow(peak_statistics_export) > 0L)
+  expect_true(all(c(
+    "summary_type",
+    "protocol_id",
+    "peak_type",
+    "mean_peak_mv",
+    "mean_latency_ms"
+  ) %in% names(peak_statistics_export)))
 })
