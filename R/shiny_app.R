@@ -150,6 +150,15 @@
   x
 }
 
+.zeus_app_can_compare_raw <- function(x, data_slot = "traces_70") {
+  if (is.null(x) || !is.list(x) || !data_slot %in% names(x)) {
+    return(FALSE)
+  }
+
+  df <- x[[data_slot]]
+  is.data.frame(df) && "value_raw" %in% names(df)
+}
+
 .zeus_app_choose_directory <- function(current = "") {
   current <- if (is.character(current) && length(current) == 1L && nzchar(current)) {
     current
@@ -160,18 +169,21 @@
   sysname <- Sys.info()[["sysname"]]
 
   if (identical(sysname, "Darwin")) {
-    script <- sprintf(
-      paste(
-        "set startFolder to POSIX file %s",
-        "set chosenFolder to choose folder with prompt %s default location startFolder",
-        "POSIX path of chosenFolder"
-      ),
-      shQuote(normalizePath(current, winslash = "/", mustWork = FALSE)),
-      shQuote("Select export directory")
-    )
-
     out <- tryCatch(
-      system2("osascript", c("-e", script), stdout = TRUE, stderr = FALSE),
+      system2(
+        "osascript",
+        c(
+          "-l", "JavaScript",
+          "-e",
+          paste0(
+            "var app = Application.currentApplication();",
+            "app.includeStandardAdditions = true;",
+            "app.chooseFolder({withPrompt: 'Select export directory'}).toString();"
+          )
+        ),
+        stdout = TRUE,
+        stderr = FALSE
+      ),
       error = function(e) character(0)
     )
 
@@ -310,7 +322,7 @@
           selected = "traces_70"
         ),
         shiny::uiOutput("mean_wavelength_ui"),
-        shiny::checkboxInput("compare_raw", "Compare raw and smoothed mean traces", value = FALSE),
+        shiny::uiOutput("compare_raw_ui"),
         shiny::checkboxInput("include_overall", "Include overall mean trace", value = TRUE),
         shiny::checkboxInput("overlay_markers", "Overlay waveform markers", value = FALSE),
         shiny::checkboxInput("include_photocell", "Include photocell overlay", value = TRUE),
@@ -400,7 +412,7 @@ zeus_app <- function() {
                 if (!is.null(logo_src)) shiny::tags$img(src = logo_src, alt = "ZEUS logo", class = "zeus-logo"),
                 shiny::div(
                   class = "zeus-hero-copy",
-                  shiny::h1("ZEUS Analysis Suite"),
+                  shiny::h1("ZEUS"),
                   shiny::p("Import ERG recordings, review waveform panels, inspect peak statistics, and export report-ready outputs.")
                 )
             ),
@@ -511,6 +523,25 @@ zeus_app <- function() {
         )
       })
 
+      output$compare_raw_ui <- shiny::renderUI({
+        data_slot <- if (!is.null(input$mean_data_slot)) input$mean_data_slot else "traces_70"
+        can_compare <- .zeus_app_can_compare_raw(imported_data(), data_slot)
+
+        shiny::tagList(
+          shiny::checkboxInput(
+            "compare_raw",
+            "Compare raw and smoothed mean traces",
+            value = FALSE
+          ),
+          if (!can_compare) {
+            shiny::tags$div(
+              style = "font-size: 0.9rem; color: #6b7280; margin-top: -0.25rem;",
+              "Raw-vs-smoothed comparison is only available when the selected data includes raw traces."
+            )
+          }
+        )
+      })
+
       output$import_summary <- shiny::renderUI({
         x <- imported_data()
 
@@ -583,6 +614,7 @@ zeus_app <- function() {
 
         imported_data(result)
         import_status("Import complete.")
+        shiny::updateCheckboxInput(session, "compare_raw", value = FALSE)
 
         choices <- .zeus_app_available_wavelengths(imported_data())
         if (length(choices) > 0L) {
@@ -618,11 +650,13 @@ zeus_app <- function() {
         }
 
         wavelength_select <- if (identical(x$protocol, "C0")) input$mean_wavelength else NULL
+        compare_raw <- isTRUE(input$compare_raw) &&
+          .zeus_app_can_compare_raw(x, input$mean_data_slot)
 
         zeus_plot_mean_waveform(
           x = x,
           data_slot = input$mean_data_slot,
-          compare_raw = isTRUE(input$compare_raw),
+          compare_raw = compare_raw,
           include_overall = isTRUE(input$include_overall),
           overlay_markers = isTRUE(input$overlay_markers),
           include_photocell = isTRUE(input$include_photocell),
