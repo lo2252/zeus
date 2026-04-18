@@ -41,6 +41,30 @@ test_that("peak settings helper includes awave window", {
   expect_equal(out$awave_window_ms, c(400, 700))
 })
 
+test_that("full fish protocol defaults and labels are assigned predictably", {
+  expect_equal(
+    .zeus_app_default_protocols(3, analysis_mode = "full_fish"),
+    c("C1", "C0", "C0")
+  )
+
+  expect_equal(
+    .zeus_app_make_item_labels(c("C1", "C0", "C0")),
+    c("C1", "C0 A", "C0 B")
+  )
+})
+
+test_that("full fish protocol validation enforces one C1 and two C0 files", {
+  expect_null(.zeus_app_validate_protocols(c("C1", "C0", "C0"), analysis_mode = "full_fish"))
+  expect_match(
+    .zeus_app_validate_protocols(c("C1", "C1", "C0"), analysis_mode = "full_fish"),
+    "1 C1 file and 2 C0 files"
+  )
+  expect_match(
+    .zeus_app_validate_protocols(c("C1", "C0"), analysis_mode = "full_fish"),
+    "exactly 3 ABF files"
+  )
+})
+
 test_that("zeus_read_abf preserves raw traces in traces_280", {
   path <- zeus_extdata("26225004.abf")
   skip_if_not(nzchar(path) && file.exists(path), "26225004.abf not found in inst/extdata")
