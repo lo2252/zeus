@@ -99,3 +99,25 @@ test_that("zeus_export_csv_bundle writes one csv per supported component", {
     "mean_latency_ms"
   ) %in% names(peak_statistics_export)))
 })
+
+test_that("zeus_export_excel_workbook writes an xlsx file", {
+  obj <- list(
+    traces_70 = data.frame(
+      stim_index = 1L,
+      stim_label = "White 3.0",
+      time_ms = 100,
+      value = 2.15
+    ),
+    stimresp_settings = list(
+      stimresp_zero_baseline = TRUE,
+      stimresp_baseline_window_ms = c(300, 400)
+    )
+  )
+
+  xlsx_path <- tempfile(fileext = ".xlsx")
+  out <- zeus_export_excel_workbook(obj, xlsx_path)
+
+  expect_equal(out, xlsx_path)
+  expect_true(file.exists(xlsx_path))
+  expect_true(file.info(xlsx_path)$size > 0)
+})

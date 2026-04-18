@@ -129,6 +129,9 @@ zeus_read_abf <- function(path,
     )
   }
 
+  erg_df <- erg_df |>
+    dplyr::mutate(value_raw = .data$value)
+
   smooth_n <- as.integer(smooth_n)
   if (smooth_n > 1L) {
     erg_df <- smooth_stimresp_traces(
@@ -263,4 +266,3 @@ abf_as_df_long <- function(raw_abf) {
     )
   })
 }
-
