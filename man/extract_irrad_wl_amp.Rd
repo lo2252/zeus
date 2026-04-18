@@ -31,6 +31,8 @@ extract_irrad_wl_amp(
 
 \item{response_window_ms}{Numeric length-2 vector for the main response.}
 
+\item{awave_window_ms}{Numeric length-2 vector for the A-wave search window.}
+
 \item{stimulus_onset_ms}{Numeric scalar used for absolute-time fallback.}
 
 \item{same_sign}{Logical; if \code{TRUE}, force the main amplitude to have a

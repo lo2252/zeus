@@ -6,6 +6,19 @@ Authors@R:
 Description: What the package does (one paragraph).
 License: MIT + file LICENSE
 Encoding: UTF-8
+Imports:
+    dplyr,
+    ggplot2,
+    pkgload,
+    purrr,
+    readABF,
+    rlang,
+    scales,
+    signal,
+    stringr,
+    tibble,
+    tidyr,
+    zoo
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3
 Suggests: 

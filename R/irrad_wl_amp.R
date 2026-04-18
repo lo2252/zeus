@@ -130,6 +130,8 @@ nd_to_log_irradiance <- function(meta, calib) {
 #'   window. If `NULL`, a default is chosen based on `time_reference`.
 #' @param response_window_ms Numeric length-2 vector for the main response
 #'   window. If `NULL`, a default is chosen based on `time_reference`.
+#' @param awave_window_ms Numeric length-2 vector for the A-wave search window.
+#'   If `NULL`, a default is chosen based on `time_reference`.
 #' @param stimulus_onset_ms Numeric scalar used only for absolute-time fallback
 #'   when computing post-stimulus timing values. Default is `400`.
 #' @param time_reference One of `"absolute"` or `"stimulus"`.
@@ -407,6 +409,7 @@ measure_trace_window <- function(trace_df,
 #' @param calib Optional calibration table.
 #' @param baseline_window_ms Numeric length-2 vector for the main baseline.
 #' @param response_window_ms Numeric length-2 vector for the main response.
+#' @param awave_window_ms Numeric length-2 vector for the A-wave search window.
 #' @param stimulus_onset_ms Numeric scalar used for absolute-time fallback.
 #' @param same_sign Logical; if `TRUE`, force the main amplitude to have a
 #'   consistent sign across traces.

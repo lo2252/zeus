@@ -187,7 +187,7 @@ zero_baseline_traces <- function(erg_df, baseline_window_ms = c(300, 400)) {
       value = .data$value - .data$baseline
     ) |>
     dplyr::ungroup() |>
-    dplyr::select(-.data$baseline)
+    dplyr::select(-baseline)
 }
 
 # Smoothing: raw traces ---------------------------------------------------
@@ -430,11 +430,11 @@ average_stimresp_reps <- function(df,
     df |>
       dplyr::left_join(
         qc |>
-          dplyr::select(.data$stim_index, .data$sweep, .data$keep),
+          dplyr::select(stim_index, sweep, keep),
         by = c("stim_index", "sweep")
       ) |>
       dplyr::filter(.data$keep) |>
-      dplyr::select(-.data$keep)
+      dplyr::select(-keep)
   } else {
     df
   }

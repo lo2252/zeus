@@ -86,19 +86,17 @@
       values_to = "peak_value_mv"
     ) |>
     dplyr::mutate(
-      latency_ms = dplyr::case_match(
-        .data$peak_metric,
-        "awave_mv" ~ .data$trough_time_poststim_ms,
-        "amp_mv" ~ .data$peak_time_poststim_ms,
-        "dwave_mv" ~ .data$dpeak_time_poststim_ms,
-        .default = NA_real_
+      latency_ms = dplyr::case_when(
+        .data$peak_metric == "awave_mv" ~ .data$trough_time_poststim_ms,
+        .data$peak_metric == "amp_mv" ~ .data$peak_time_poststim_ms,
+        .data$peak_metric == "dwave_mv" ~ .data$dpeak_time_poststim_ms,
+        TRUE ~ NA_real_
       ),
-      peak_type = dplyr::case_match(
-        .data$peak_metric,
-        "awave_mv" ~ "A-wave",
-        "amp_mv" ~ "B-wave",
-        "dwave_mv" ~ "D-wave",
-        .default = .data$peak_metric
+      peak_type = dplyr::case_when(
+        .data$peak_metric == "awave_mv" ~ "A-wave",
+        .data$peak_metric == "amp_mv" ~ "B-wave",
+        .data$peak_metric == "dwave_mv" ~ "D-wave",
+        TRUE ~ .data$peak_metric
       ),
       wavelength = as.character(.data$wavelength),
       wavelength_label = dplyr::if_else(
@@ -167,22 +165,22 @@
     wavelength_export
   ) |>
     dplyr::select(
-      .data$summary_type,
-      .data$protocol_id,
-      .data$grouping_variable,
-      .data$grouping_value,
-      .data$peak_type,
-      .data$wavelength,
-      .data$stim_nd,
-      .data$n,
-      .data$mean_peak_mv,
-      .data$sd_peak_mv,
-      .data$sem_peak_mv,
-      .data$median_peak_mv,
-      .data$min_peak_mv,
-      .data$max_peak_mv,
-      .data$mean_latency_ms,
-      .data$sd_latency_ms
+      summary_type,
+      protocol_id,
+      grouping_variable,
+      grouping_value,
+      peak_type,
+      wavelength,
+      stim_nd,
+      n,
+      mean_peak_mv,
+      sd_peak_mv,
+      sem_peak_mv,
+      median_peak_mv,
+      min_peak_mv,
+      max_peak_mv,
+      mean_latency_ms,
+      sd_latency_ms
     )
 }
 
@@ -285,7 +283,7 @@ zeus_avg_peak_by_wavelength <- function(
       .data$wavelength_label != "White"
     ) |>
     .zeus_peak_summary(group_cols = c("protocol_id", "wavelength_label", "peak_type")) |>
-    dplyr::rename(wavelength = .data$wavelength_label) |>
+    dplyr::rename(wavelength = wavelength_label) |>
     dplyr::arrange(.data$protocol_id, .data$wavelength, .data$peak_type)
 }
 
