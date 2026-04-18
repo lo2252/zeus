@@ -1223,6 +1223,9 @@ zeus_plot_intensity_response <- function(
 #' @param stim_levels Optional numeric vector giving the desired ND levels to
 #'   display and their legend order (highest = dimmest first).  If `NULL`,
 #'   all ND levels present in the data are used in descending order.
+#' @param wavelength_select Optional character string used to filter spectral
+#'   plots to one wavelength block (for example `"570"` or `"650A"`). Use
+#'   `NULL` to show all wavelength blocks. Ignored for single-wavelength data.
 #' @param include_photocell Logical; if `TRUE` (default), overlays the mean
 #'   photocell trace on every panel when photocell data are available.
 #' @param photocell_filter Character pattern used to identify the photocell
@@ -1249,6 +1252,7 @@ zeus_plot_spectral_waveform <- function(
     data_slot = c("traces_70", "traces_280"),
     channel_filter = NULL,
     stim_levels = NULL,
+    wavelength_select = NULL,
     include_photocell = TRUE,
     photocell_filter = "Photocell",
     photocell_color = "black",
@@ -1287,6 +1291,22 @@ zeus_plot_spectral_waveform <- function(
     dplyr::mutate(
       .wl_prefix = stringr::str_extract(.data$stim_label, "^\\S+")
     )
+
+  if (!is.null(wavelength_select)) {
+    wavelength_select <- as.character(wavelength_select)[1]
+    available_prefixes <- unique(stats::na.omit(df_plot$.wl_prefix))
+
+    if (!(wavelength_select %in% available_prefixes)) {
+      stop(
+        "`wavelength_select` must match one of: ",
+        paste(available_prefixes, collapse = ", "),
+        call. = FALSE
+      )
+    }
+
+    df_plot <- df_plot |>
+      dplyr::filter(.data$.wl_prefix == wavelength_select)
+  }
 
   unique_prefixes <- unique(df_plot$.wl_prefix)
 

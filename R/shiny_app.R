@@ -111,7 +111,6 @@
 
 .zeus_app_write_export_bundle <- function(bundle_dir,
                                           file_stem,
-                                          export_format,
                                           mean_plot,
                                           spectral_plot,
                                           intensity_plot,
@@ -123,12 +122,7 @@
   ggplot2::ggsave(export_paths$mean_plot, plot = mean_plot, width = 11, height = 6.5, dpi = 320, bg = "white")
   ggplot2::ggsave(export_paths$spectral_plot, plot = spectral_plot, width = 14, height = 9, dpi = 320, bg = "white")
   ggplot2::ggsave(export_paths$intensity_plot, plot = intensity_plot, width = 11, height = 6.5, dpi = 320, bg = "white")
-
-  if (identical(export_format, "excel")) {
-    zeus_export_excel_workbook(x, file.path(bundle_dir, paste0(file_stem, "_data.xlsx")))
-  } else {
-    zeus_export_csv_bundle(x, export_paths$csv_base)
-  }
+  zeus_export_csv_bundle(x, export_paths$csv_base)
 
   invisible(export_paths)
 }
@@ -272,12 +266,12 @@
 .zeus_app_theme <- function() {
   bslib::bs_theme(
     version = 5,
-    bg = "#F6F1E8",
-    fg = "#14253D",
-    primary = "#C42E4E",
-    secondary = "#253B6F",
-    success = "#6A8C69",
-    info = "#385D8A",
+    bg = "#EAF7FB",
+    fg = "#12344C",
+    primary = "#157FA8",
+    secondary = "#2F5D76",
+    success = "#2F8C8C",
+    info = "#5BB7D4",
     base_font = "Georgia",
     heading_font = "Palatino Linotype",
     code_font = "Courier New"
@@ -319,7 +313,34 @@
     ),
     bslib::accordion(
       id = "zeus_controls",
-      open = c("Import Settings", "Plot Settings", "Peak Settings", "Export"),
+      open = c("Peak Settings", "Import Settings", "Plot Settings", "Export"),
+      bslib::accordion_panel(
+        "Peak Settings",
+        shiny::selectInput(
+          "time_reference",
+          "Time reference",
+          choices = c("absolute", "stimulus"),
+          selected = "absolute"
+        ),
+        shiny::numericInput("stimulus_onset_ms", "Stimulus onset (ms)", value = 400, step = 1),
+        shiny::checkboxInput("same_sign", "Force consistent B-wave sign", value = TRUE),
+        shiny::fluidRow(
+          shiny::column(6, shiny::numericInput("peak_baseline_start", "Baseline start (ms)", value = 300)),
+          shiny::column(6, shiny::numericInput("peak_baseline_end", "Baseline end (ms)", value = 400))
+        ),
+        shiny::fluidRow(
+          shiny::column(6, shiny::numericInput("peak_response_start", "Response start (ms)", value = 400)),
+          shiny::column(6, shiny::numericInput("peak_response_end", "Response end (ms)", value = 700))
+        ),
+        shiny::fluidRow(
+          shiny::column(6, shiny::numericInput("awave_window_start", "A-wave start (ms)", value = 400)),
+          shiny::column(6, shiny::numericInput("awave_window_end", "A-wave end (ms)", value = 700))
+        ),
+        shiny::fluidRow(
+          shiny::column(6, shiny::numericInput("dwave_window_start", "D-wave start (ms)", value = 700)),
+          shiny::column(6, shiny::numericInput("dwave_window_end", "D-wave end (ms)", value = 1000))
+        )
+      ),
       bslib::accordion_panel(
         "Import Settings",
         shiny::textInput("erg_channel", "ERG Channel", value = "ERG DAM80"),
@@ -352,57 +373,12 @@
       ),
       bslib::accordion_panel(
         "Plot Settings",
-        shiny::selectInput(
-          "mean_data_slot",
-          "Mean waveform source",
-          choices = c("traces_70", "traces_280"),
-          selected = "traces_70"
-        ),
-        shiny::uiOutput("mean_wavelength_ui"),
-        shiny::uiOutput("compare_raw_ui"),
-        shiny::checkboxInput("include_overall", "Include overall mean trace", value = TRUE),
-        shiny::checkboxInput("overlay_markers", "Overlay waveform markers", value = FALSE),
-        shiny::checkboxInput("include_photocell", "Include photocell overlay", value = TRUE),
-        shiny::checkboxInput("use_se", "Show SE on intensity response", value = TRUE)
-      ),
-      bslib::accordion_panel(
-        "Peak Settings",
-        shiny::selectInput(
-          "time_reference",
-          "Time reference",
-          choices = c("absolute", "stimulus"),
-          selected = "absolute"
-        ),
-        shiny::numericInput("stimulus_onset_ms", "Stimulus onset (ms)", value = 400, step = 1),
-        shiny::checkboxInput("same_sign", "Force consistent B-wave sign", value = TRUE),
-        shiny::fluidRow(
-          shiny::column(6, shiny::numericInput("peak_baseline_start", "Baseline start (ms)", value = 300)),
-          shiny::column(6, shiny::numericInput("peak_baseline_end", "Baseline end (ms)", value = 400))
-        ),
-        shiny::fluidRow(
-          shiny::column(6, shiny::numericInput("peak_response_start", "Response start (ms)", value = 400)),
-          shiny::column(6, shiny::numericInput("peak_response_end", "Response end (ms)", value = 700))
-        ),
-        shiny::fluidRow(
-          shiny::column(6, shiny::numericInput("awave_window_start", "A-wave start (ms)", value = 400)),
-          shiny::column(6, shiny::numericInput("awave_window_end", "A-wave end (ms)", value = 700))
-        ),
-        shiny::fluidRow(
-          shiny::column(6, shiny::numericInput("dwave_window_start", "D-wave start (ms)", value = 700)),
-          shiny::column(6, shiny::numericInput("dwave_window_end", "D-wave end (ms)", value = 1000))
-        )
+        shiny::uiOutput("plot_settings_ui")
       ),
       bslib::accordion_panel(
         "Export",
-        shiny::radioButtons(
-          "export_format",
-          "Data export format",
-          choices = c("CSV bundle" = "csv", "Excel workbook" = "excel"),
-          selected = "csv",
-          inline = TRUE
-        ),
         shiny::textInput("export_name", "Export file name", value = ""),
-        shiny::downloadButton("download_bundle", "Download Data and Plots", class = "btn-zeus-secondary"),
+        shiny::downloadButton("download_csv_bundle", "Download CSV Bundle", class = "btn-zeus-secondary"),
         shiny::tags$div(
           style = "font-size: 0.9rem; color: #6b7280; margin-top: 0.5rem;",
           "Your browser will ask where to save the export zip file."
@@ -479,6 +455,7 @@ zeus_app <- function() {
                   class = "zeus-card",
                   full_screen = TRUE,
                   bslib::card_header("Mean Waveform"),
+                  shiny::uiOutput("mean_wavelength_ui"),
                   shiny::plotOutput("mean_plot", height = "520px")
                 ),
                 bslib::card(
@@ -525,43 +502,94 @@ zeus_app <- function() {
       import_status <- shiny::reactiveVal("Waiting for file import.")
 
       output$mean_wavelength_ui <- shiny::renderUI({
-        if (is.null(imported_data()) && !identical(input$protocol, "C0")) {
+        x <- imported_data()
+
+        if (is.null(x) || !identical(x$protocol, "C0")) {
           return(NULL)
         }
 
-        if (!identical(input$protocol, "C0")) {
-          return(NULL)
-        }
-
-        choices <- .zeus_app_available_wavelengths(imported_data())
+        choices <- .zeus_app_available_wavelengths(x)
         if (length(choices) == 0L) {
           choices <- "450"
         }
+        selected_choice <- if ("450" %in% choices) "450" else choices[[1]]
 
         shiny::selectInput(
           "mean_wavelength",
           "C0 waveform block",
           choices = choices,
-          selected = choices[[1]]
+          selected = selected_choice
         )
       })
 
-      output$compare_raw_ui <- shiny::renderUI({
-        data_slot <- if (!is.null(input$mean_data_slot)) input$mean_data_slot else "traces_70"
-        can_compare <- .zeus_app_can_compare_raw(imported_data(), data_slot)
+      output$plot_settings_ui <- shiny::renderUI({
+        x <- imported_data()
+
+        if (is.null(x)) {
+          return(
+            shiny::tags$div(
+              style = "font-size: 0.95rem; color: #6b7280;",
+              "Import a file to load plot options."
+            )
+          )
+        }
+
+        available_slots <- c()
+        if (is.data.frame(x$traces_70)) {
+          available_slots <- c(available_slots, "traces_70")
+        }
+        if (is.data.frame(x$traces_280)) {
+          available_slots <- c(available_slots, "traces_280")
+        }
+        if (length(available_slots) == 0L) {
+          available_slots <- "traces_70"
+        }
+
+        selected_slot <- if (!is.null(input$mean_data_slot) && input$mean_data_slot %in% available_slots) {
+          input$mean_data_slot
+        } else {
+          available_slots[[1]]
+        }
+        can_compare <- .zeus_app_can_compare_raw(x, selected_slot)
 
         shiny::tagList(
+          shiny::selectInput(
+            "mean_data_slot",
+            "Mean waveform source",
+            choices = stats::setNames(available_slots, available_slots),
+            selected = selected_slot
+          ),
           shiny::checkboxInput(
             "compare_raw",
             "Compare raw and smoothed mean traces",
-            value = FALSE
+            value = isTRUE(input$compare_raw) && can_compare
           ),
           if (!can_compare) {
             shiny::tags$div(
               style = "font-size: 0.9rem; color: #6b7280; margin-top: -0.25rem;",
               "Raw-vs-smoothed comparison is only available when the selected data includes raw traces."
             )
-          }
+          },
+          shiny::checkboxInput(
+            "include_overall",
+            "Include overall mean trace",
+            value = if (!is.null(input$include_overall)) isTRUE(input$include_overall) else TRUE
+          ),
+          shiny::checkboxInput(
+            "overlay_markers",
+            "Overlay waveform markers",
+            value = if (!is.null(input$overlay_markers)) isTRUE(input$overlay_markers) else FALSE
+          ),
+          shiny::checkboxInput(
+            "include_photocell",
+            "Include photocell overlay",
+            value = if (!is.null(input$include_photocell)) isTRUE(input$include_photocell) else TRUE
+          ),
+          shiny::checkboxInput(
+            "use_se",
+            "Show SE on intensity response",
+            value = if (!is.null(input$use_se)) isTRUE(input$use_se) else TRUE
+          )
         )
       })
 
@@ -641,11 +669,12 @@ zeus_app <- function() {
 
         choices <- .zeus_app_available_wavelengths(imported_data())
         if (length(choices) > 0L) {
+          selected_choice <- if ("450" %in% choices) "450" else choices[[1]]
           shiny::updateSelectInput(
             session,
             "mean_wavelength",
             choices = choices,
-            selected = choices[[1]]
+            selected = selected_choice
           )
         }
 
@@ -743,7 +772,7 @@ zeus_app <- function() {
         .zeus_app_table(peak_statistics()$combined_export)
       })
 
-      output$download_bundle <- shiny::downloadHandler(
+      output$download_csv_bundle <- shiny::downloadHandler(
         filename = function() {
           file_stem <- trimws(input$export_name)
           if (!nzchar(file_stem)) {
@@ -752,38 +781,48 @@ zeus_app <- function() {
           paste0(file_stem, "_bundle.zip")
         },
         content = function(file) {
-        x <- imported_data()
-        shiny::req(x)
+          x <- imported_data()
+          shiny::req(x)
           file_stem <- trimws(input$export_name)
           if (!nzchar(file_stem)) {
             file_stem <- "zeus_export"
           }
 
-          bundle_dir <- file.path(tempdir(), paste0(file_stem, "_bundle"))
-          unlink(bundle_dir, recursive = TRUE, force = TRUE)
+          shiny::withProgress(message = "Preparing CSV export", value = 0, {
+            bundle_dir <- file.path(tempdir(), paste0(file_stem, "_bundle"))
+            unlink(bundle_dir, recursive = TRUE, force = TRUE)
+            shiny::incProgress(0.1, detail = "Creating plot and CSV files")
 
-          shiny::withProgress(message = "Preparing export zip", value = 0.15, {
             .zeus_app_write_export_bundle(
               bundle_dir = bundle_dir,
               file_stem = file_stem,
-              export_format = input$export_format,
               mean_plot = mean_plot_obj(),
               spectral_plot = spectral_plot_obj(),
               intensity_plot = intensity_plot_obj(),
               x = x
             )
-            shiny::incProgress(0.7)
 
+            shiny::incProgress(0.65, detail = "Compressing CSV bundle")
             zip_files <- list.files(bundle_dir)
+            tmp_zip <- tempfile(pattern = paste0(file_stem, "_"), fileext = ".zip")
             .zeus_zip_files(
-              zipfile = file,
+              zipfile = tmp_zip,
               files = zip_files,
               root_dir = bundle_dir
             )
-            shiny::incProgress(0.15)
+
+            shiny::incProgress(0.2, detail = "Finalizing download")
+            ok <- file.copy(tmp_zip, file, overwrite = TRUE)
+            if (!isTRUE(ok) || !file.exists(file)) {
+              stop("Failed to prepare ZIP download.", call. = FALSE)
+            }
+            shiny::incProgress(0.05)
           })
-        }
+        },
+        contentType = "application/zip"
       )
+
+      shiny::outputOptions(output, "download_csv_bundle", suspendWhenHidden = FALSE)
     }
   )
 }
