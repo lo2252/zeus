@@ -109,6 +109,30 @@
   )
 }
 
+.zeus_app_write_export_bundle <- function(bundle_dir,
+                                          file_stem,
+                                          export_format,
+                                          mean_plot,
+                                          spectral_plot,
+                                          intensity_plot,
+                                          x) {
+  dir.create(bundle_dir, recursive = TRUE, showWarnings = FALSE)
+
+  export_paths <- .zeus_app_export_paths(bundle_dir, file_stem)
+
+  ggplot2::ggsave(export_paths$mean_plot, plot = mean_plot, width = 11, height = 6.5, dpi = 320, bg = "white")
+  ggplot2::ggsave(export_paths$spectral_plot, plot = spectral_plot, width = 14, height = 9, dpi = 320, bg = "white")
+  ggplot2::ggsave(export_paths$intensity_plot, plot = intensity_plot, width = 11, height = 6.5, dpi = 320, bg = "white")
+
+  if (identical(export_format, "excel")) {
+    zeus_export_excel_workbook(x, file.path(bundle_dir, paste0(file_stem, "_data.xlsx")))
+  } else {
+    zeus_export_csv_bundle(x, export_paths$csv_base)
+  }
+
+  invisible(export_paths)
+}
+
 .zeus_app_placeholder_plot <- function(message) {
   ggplot2::ggplot(data.frame(x = 0, y = 0), ggplot2::aes(.data$x, .data$y)) +
     ggplot2::geom_text(
@@ -166,6 +190,17 @@
     path.expand("~")
   }
 
+  if (requireNamespace("rstudioapi", quietly = TRUE) && isTRUE(rstudioapi::isAvailable())) {
+    out <- tryCatch(
+      rstudioapi::selectDirectory(caption = "Select export directory", path = current),
+      error = function(e) ""
+    )
+
+    if (is.character(out) && length(out) == 1L && nzchar(out)) {
+      return(out)
+    }
+  }
+
   sysname <- Sys.info()[["sysname"]]
 
   if (identical(sysname, "Darwin")) {
@@ -178,7 +213,9 @@
           paste0(
             "var app = Application.currentApplication();",
             "app.includeStandardAdditions = true;",
-            "app.chooseFolder({withPrompt: 'Select export directory'}).toString();"
+            "app.chooseFolder({withPrompt: 'Select export directory', defaultLocation: Path('",
+            normalizePath(current, winslash = "/", mustWork = FALSE),
+            "')}).toString();"
           )
         ),
         stdout = TRUE,
@@ -276,7 +313,7 @@
         "protocol",
         "Protocol",
         choices = c("C0", "C1"),
-        selected = "C0"
+        selected = "C1"
       ),
       shiny::actionButton("import_file", "Import File", class = "btn-zeus-primary")
     ),
@@ -357,10 +394,19 @@
       ),
       bslib::accordion_panel(
         "Export",
-        shiny::actionButton("export_dir_pick", "Choose export directory", class = "btn-zeus-secondary"),
-        shiny::verbatimTextOutput("export_dir_display"),
+        shiny::radioButtons(
+          "export_format",
+          "Data export format",
+          choices = c("CSV bundle" = "csv", "Excel workbook" = "excel"),
+          selected = "csv",
+          inline = TRUE
+        ),
         shiny::textInput("export_name", "Export file name", value = ""),
-        shiny::actionButton("export_all", "Export Plots and CSV", class = "btn-zeus-secondary"),
+        shiny::downloadButton("download_bundle", "Download Data and Plots", class = "btn-zeus-secondary"),
+        shiny::tags$div(
+          style = "font-size: 0.9rem; color: #6b7280; margin-top: 0.5rem;",
+          "Your browser will ask where to save the export zip file."
+        ),
         shiny::tags$hr(),
         shiny::actionButton("close_app", "Close App", class = "btn-zeus-secondary")
       )
@@ -477,29 +523,6 @@ zeus_app <- function() {
     server = function(input, output, session) {
       imported_data <- shiny::reactiveVal(NULL)
       import_status <- shiny::reactiveVal("Waiting for file import.")
-      export_dir <- shiny::reactiveVal("")
-
-      shiny::observeEvent(input$export_dir_pick, {
-        selected_dir <- .zeus_app_choose_directory(export_dir())
-
-        if (is.character(selected_dir) && length(selected_dir) == 1L && nzchar(selected_dir)) {
-          export_dir(selected_dir)
-        } else {
-          shiny::showNotification(
-            "No export directory was selected.",
-            type = "message"
-          )
-        }
-      }, ignoreInit = TRUE)
-
-      output$export_dir_display <- shiny::renderText({
-        dir_value <- export_dir()
-        if (!nzchar(dir_value)) {
-          "No export directory selected."
-        } else {
-          dir_value
-        }
-      })
 
       output$mean_wavelength_ui <- shiny::renderUI({
         if (is.null(imported_data()) && !identical(input$protocol, "C0")) {
@@ -720,41 +743,47 @@ zeus_app <- function() {
         .zeus_app_table(peak_statistics()$combined_export)
       })
 
-      shiny::observeEvent(input$export_all, {
+      output$download_bundle <- shiny::downloadHandler(
+        filename = function() {
+          file_stem <- trimws(input$export_name)
+          if (!nzchar(file_stem)) {
+            file_stem <- "zeus_export"
+          }
+          paste0(file_stem, "_bundle.zip")
+        },
+        content = function(file) {
         x <- imported_data()
         shiny::req(x)
-        selected_dir <- export_dir()
+          file_stem <- trimws(input$export_name)
+          if (!nzchar(file_stem)) {
+            file_stem <- "zeus_export"
+          }
 
-        if (!nzchar(selected_dir) || !nzchar(input$export_name)) {
-          shiny::showNotification(
-            "Provide both an export directory and an export file name before exporting.",
-            type = "error"
-          )
-          return()
+          bundle_dir <- file.path(tempdir(), paste0(file_stem, "_bundle"))
+          unlink(bundle_dir, recursive = TRUE, force = TRUE)
+
+          shiny::withProgress(message = "Preparing export zip", value = 0.15, {
+            .zeus_app_write_export_bundle(
+              bundle_dir = bundle_dir,
+              file_stem = file_stem,
+              export_format = input$export_format,
+              mean_plot = mean_plot_obj(),
+              spectral_plot = spectral_plot_obj(),
+              intensity_plot = intensity_plot_obj(),
+              x = x
+            )
+            shiny::incProgress(0.7)
+
+            zip_files <- list.files(bundle_dir)
+            .zeus_zip_files(
+              zipfile = file,
+              files = zip_files,
+              root_dir = bundle_dir
+            )
+            shiny::incProgress(0.15)
+          })
         }
-
-        dir.create(selected_dir, recursive = TRUE, showWarnings = FALSE)
-
-        if (!dir.exists(selected_dir)) {
-          shiny::showNotification("The export directory could not be created.", type = "error")
-          return()
-        }
-
-        export_paths <- .zeus_app_export_paths(selected_dir, input$export_name)
-
-        shiny::withProgress(message = "Exporting plots and CSV files", value = 0.1, {
-          ggplot2::ggsave(export_paths$mean_plot, plot = mean_plot_obj(), width = 11, height = 6.5, dpi = 320, bg = "white")
-          shiny::incProgress(0.3)
-          ggplot2::ggsave(export_paths$spectral_plot, plot = spectral_plot_obj(), width = 14, height = 9, dpi = 320, bg = "white")
-          shiny::incProgress(0.3)
-          ggplot2::ggsave(export_paths$intensity_plot, plot = intensity_plot_obj(), width = 11, height = 6.5, dpi = 320, bg = "white")
-          shiny::incProgress(0.2)
-          zeus_export_csv_bundle(x, export_paths$csv_base)
-          shiny::incProgress(0.2)
-        })
-
-        shiny::showNotification("Plots and CSV bundle exported.", type = "message")
-      }, ignoreInit = TRUE)
+      )
     }
   )
 }

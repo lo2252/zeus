@@ -40,3 +40,14 @@ test_that("peak settings helper includes awave window", {
 
   expect_equal(out$awave_window_ms, c(400, 700))
 })
+
+test_that("zeus_read_abf preserves raw traces in traces_280", {
+  path <- zeus_extdata("26225004.abf")
+  skip_if_not(nzchar(path) && file.exists(path), "26225004.abf not found in inst/extdata")
+
+  x <- zeus_read_abf(path, protocol = "C1", smooth_n = 3L)
+
+  expect_true("value_raw" %in% names(x$traces_280))
+  expect_true(any(is.finite(x$traces_280$value_raw)))
+  expect_true(any(abs(x$traces_280$value - x$traces_280$value_raw) > 0, na.rm = TRUE))
+})
