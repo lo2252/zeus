@@ -9,6 +9,7 @@ zeus_avg_peak_by_nd(
   calib = NULL,
   baseline_window_ms = NULL,
   response_window_ms = NULL,
+  awave_window_ms = NULL,
   stimulus_onset_ms = 400,
   same_sign = TRUE,
   time_reference = c("absolute", "stimulus"),
@@ -28,6 +29,8 @@ zeus_avg_peak_by_nd(
 \item{baseline_window_ms}{Numeric length-2 vector for the main baseline.}
 
 \item{response_window_ms}{Numeric length-2 vector for the main response.}
+
+\item{awave_window_ms}{Numeric length-2 vector for the A-wave search window.}
 
 \item{stimulus_onset_ms}{Numeric scalar used for absolute-time fallback.}
 

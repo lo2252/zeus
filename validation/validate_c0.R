@@ -1,5 +1,5 @@
 # validate_c0.R
-# ==============================================================================
+
 # Validate ZEUS C0 (spectral) protocol transformation against Origin export.
 #
 # Run this script from the package root directory:
@@ -11,12 +11,10 @@
 #   inst/extdata/26225005.abf
 #   /Volumes/LOGANUSB/origin_files/26225005_origin_export_with_d_wave.xlsx
 #   Or temp_file/26225005_origin_export_with_d_wave.xlsx
-# ==============================================================================
 
-# ------------------------------------------------------------------------------
-# 1. Load the ZEUS package
-# ------------------------------------------------------------------------------
 
+
+# Load the ZEUS package
 if (!requireNamespace("pkgload", quietly = TRUE)) {
   install.packages("pkgload")
 }
@@ -30,10 +28,7 @@ suppressPackageStartupMessages({
   library(tibble)
 })
 
-# ------------------------------------------------------------------------------
-# 2. File paths
-# ------------------------------------------------------------------------------
-
+# File paths
 abf_path    <- file.path("inst", "extdata", "26225005.abf")
 xlsx_path   <- file.path("temp_file", "26225005_origin_export_with_d_wave.xlsx")
 xlsx_fallback <- file.path("/Volumes", "LOGANUSB", "origin_files", "26225005_origin_export_with_d_wave.xlsx")
@@ -100,10 +95,8 @@ summarise_agreement <- function(df, val_col, ref_col, label) {
   ))
 }
 
-# ------------------------------------------------------------------------------
-# 3. Import ZEUS C0 data
-# ------------------------------------------------------------------------------
 
+# Import ZEUS C0 data
 cat("\n-- Importing ZEUS C0 ABF --\n")
 zeus_obj <- zeus_read_abf(abf_path, protocol = "C0")
 traces_280 <- zeus_obj$traces_280 |>
@@ -115,10 +108,8 @@ cat(sprintf(
   nrow(traces_280)
 ))
 
-# ------------------------------------------------------------------------------
-# 4. Import Origin StimResp
-# ------------------------------------------------------------------------------
 
+# Import Origin StimResp
 cat("\n-- Importing Origin C0 StimResp --\n")
 raw_sheet <- readxl::read_excel(xlsx_path, sheet = sheet_name, col_names = TRUE)
 
@@ -157,10 +148,8 @@ origin_70 <- tibble::tibble(
 cat("\nOrigin 70-condition protocol:\n")
 print(origin_70, n = Inf)
 
-# ------------------------------------------------------------------------------
-# 5. Build Zeus 70-label protocol and compare to Origin order
-# ------------------------------------------------------------------------------
 
+# Build Zeus 70-label protocol and compare to Origin order
 cat("\n-- Comparing C0 protocol labels to Origin --\n")
 
 zeus_70 <- protocol_table_C0() |>
@@ -190,10 +179,8 @@ if (nrow(mismatches) > 0L) {
   cat("  All 70 C0 protocol labels match Origin exactly.\n")
 }
 
-# ------------------------------------------------------------------------------
-# 6. Compare sweep → stim_index mapping for first and last few sweeps
-# ------------------------------------------------------------------------------
 
+# Compare sweep → stim_index mapping for first and last few sweeps
 cat("\n-- Sweep-to-stim mapping validation (4-rep protocol) --\n")
 
 sweep_tbl <- expand_protocol_repeats(protocol_table_C0(), repeats_per_stim = 4L) |>
@@ -228,8 +215,8 @@ if (nrow(sweep_mismatches) > 0L) {
   cat("  All 280 sweep labels match Origin exactly.\n")
 }
 
-# ------------------------------------------------------------------------------
-# 7. Mean trace comparison: ZEUS vs Origin
+
+# Mean trace comparison: ZEUS vs Origin
 #
 # Origin StimResp contains BASELINE-CORRECTED, AVERAGED traces.
 # The correct ZEUS counterpart is traces_70:
@@ -239,7 +226,6 @@ if (nrow(sweep_mismatches) > 0L) {
 #                 secondary comparison to quantify smoothing effect.
 # Using raw traces_280 (per-sweep, no baseline correction) would yield poor
 # agreement because the DC offset is not removed.
-# ------------------------------------------------------------------------------
 
 cat("\n-- Mean trace comparison --\n")
 
@@ -338,10 +324,7 @@ if (nrow(wave_compare) == 0L) {
   print(by_label, n = 10)
 }
 
-# ------------------------------------------------------------------------------
-# 8. Irrad-wl-Amp comparison: per-stimulus measurements and summary statistics
-# ------------------------------------------------------------------------------
-
+# Irrad-wl-Amp comparison: per-stimulus measurements and summary statistics
 cat("\n-- Comparing C0 Irrad-wl-Amp statistics to Origin --\n")
 
 origin_irrad <- read_origin_irrad(xlsx_path, zeus_70)
@@ -427,10 +410,7 @@ if (nrow(stats_compare) > 0L) {
   summarise_agreement(stats_compare, "zeus_mean_latency_ms", "origin_mean_latency_ms", "Summary mean latency")
 }
 
-# ------------------------------------------------------------------------------
-# 9. Summary
-# ------------------------------------------------------------------------------
-
+# Summary
 cat("\n== C0 Validation Summary ==\n")
 cat(sprintf("  Protocol labels match:  %d / 70\n",  n_match))
 cat(sprintf("  Sweep labels match:     %d / 280\n", n_sweep_match))

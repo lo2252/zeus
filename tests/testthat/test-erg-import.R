@@ -7,11 +7,7 @@
 # C0 import ---------------------------------------------------------------
 
 test_that("zeus_read_abf C0: traces_280 has 280 unique sweeps", {
-  path <- zeus_extdata("26225005.abf")
-  skip_if_not(nzchar(path) && file.exists(path),
-              "26225005.abf not found in inst/extdata")
-
-  obj <- zeus_read_abf(path, protocol = "C0")
+  obj <- zeus_test_obj("C0")
 
   expect_s3_class(obj, "zeus_stimresp")
   expect_true(!is.null(obj$traces_280))
@@ -21,11 +17,7 @@ test_that("zeus_read_abf C0: traces_280 has 280 unique sweeps", {
 })
 
 test_that("zeus_read_abf C0: traces_280 contains required columns", {
-  path <- zeus_extdata("26225005.abf")
-  skip_if_not(nzchar(path) && file.exists(path),
-              "26225005.abf not found in inst/extdata")
-
-  obj <- zeus_read_abf(path, protocol = "C0")
+  obj <- zeus_test_obj("C0")
 
   required <- c("sweep", "time", "time_ms", "value",
                 "stim_index", "stim_label", "wavelength", "stim_nd",
@@ -34,11 +26,7 @@ test_that("zeus_read_abf C0: traces_280 contains required columns", {
 })
 
 test_that("zeus_read_abf C0: stim_labels in traces_280 match Origin export", {
-  path <- zeus_extdata("26225005.abf")
-  skip_if_not(nzchar(path) && file.exists(path),
-              "26225005.abf not found in inst/extdata")
-
-  obj <- zeus_read_abf(path, protocol = "C0")
+  obj <- zeus_test_obj("C0")
   t280 <- obj$traces_280
 
   # All 280 sweeps should have a non-NA stim_label
@@ -54,11 +42,7 @@ test_that("zeus_read_abf C0: stim_labels in traces_280 match Origin export", {
 })
 
 test_that("zeus_read_abf C0: traces_70 has 70 unique stim conditions", {
-  path <- zeus_extdata("26225005.abf")
-  skip_if_not(nzchar(path) && file.exists(path),
-              "26225005.abf not found in inst/extdata")
-
-  obj <- zeus_read_abf(path, protocol = "C0")
+  obj <- zeus_test_obj("C0")
 
   expect_true(!is.null(obj$traces_70))
 
@@ -67,11 +51,7 @@ test_that("zeus_read_abf C0: traces_70 has 70 unique stim conditions", {
 })
 
 test_that("zeus_read_abf C0: traces_70 retains wavelength and stim_nd metadata", {
-  path <- zeus_extdata("26225005.abf")
-  skip_if_not(nzchar(path) && file.exists(path),
-              "26225005.abf not found in inst/extdata")
-
-  obj <- zeus_read_abf(path, protocol = "C0")
+  obj <- zeus_test_obj("C0")
   t70 <- obj$traces_70
 
   # Required metadata columns must be present after averaging
@@ -84,10 +64,6 @@ test_that("zeus_read_abf C0: traces_70 retains wavelength and stim_nd metadata",
 })
 
 test_that("zeus_read_abf C0: traces_70 stim_labels match Origin-validated labels", {
-  path <- zeus_extdata("26225005.abf")
-  skip_if_not(nzchar(path) && file.exists(path),
-              "26225005.abf not found in inst/extdata")
-
   # Expected 70 Origin stim_labels in protocol order
   origin_labels <- c(
     "650A 4.0", "650A 3.5", "650A 3.0", "650A 2.5", "650A 2.0", "650A 1.5", "650A 1.0",
@@ -102,7 +78,7 @@ test_that("zeus_read_abf C0: traces_70 stim_labels match Origin-validated labels
     "370 5.0",  "370 4.5",  "370 4.0",  "370 3.5",  "370 3.0",  "370 2.5",  "370 2.0"
   )
 
-  obj <- zeus_read_abf(path, protocol = "C0")
+  obj <- zeus_test_obj("C0")
   t70  <- obj$traces_70
 
   # One row of metadata per stim_index; retrieve sorted by stim_index
@@ -114,11 +90,7 @@ test_that("zeus_read_abf C0: traces_70 stim_labels match Origin-validated labels
 })
 
 test_that("zeus_read_abf C0: n_reps_used reflects correct technical replicate count", {
-  path <- zeus_extdata("26225005.abf")
-  skip_if_not(nzchar(path) && file.exists(path),
-              "26225005.abf not found in inst/extdata")
-
-  obj <- zeus_read_abf(path, protocol = "C0")
+  obj <- zeus_test_obj("C0")
   t70 <- obj$traces_70
 
   # Each averaged condition should use exactly 4 technical replicates
@@ -134,11 +106,7 @@ test_that("zeus_read_abf C0: n_reps_used reflects correct technical replicate co
 # C1 import ---------------------------------------------------------------
 
 test_that("zeus_read_abf C1: basic structure is correct", {
-  path <- zeus_extdata("26225004.abf")
-  skip_if_not(nzchar(path) && file.exists(path),
-              "26225004.abf not found in inst/extdata")
-
-  obj <- zeus_read_abf(path, protocol = "C1")
+  obj <- zeus_test_obj("C1")
 
   expect_s3_class(obj, "zeus_stimresp")
   expect_false(is.null(obj$traces_280))
@@ -146,22 +114,14 @@ test_that("zeus_read_abf C1: basic structure is correct", {
 })
 
 test_that("zeus_read_abf C1: traces_70 has 70 unique stim conditions", {
-  path <- zeus_extdata("26225004.abf")
-  skip_if_not(nzchar(path) && file.exists(path),
-              "26225004.abf not found in inst/extdata")
-
-  obj <- zeus_read_abf(path, protocol = "C1")
+  obj <- zeus_test_obj("C1")
 
   n_stim <- dplyr::n_distinct(obj$traces_70$stim_index)
   expect_equal(n_stim, 70L)
 })
 
 test_that("zeus_read_abf C1: all stim_labels use White wavelength", {
-  path <- zeus_extdata("26225004.abf")
-  skip_if_not(nzchar(path) && file.exists(path),
-              "26225004.abf not found in inst/extdata")
-
-  obj <- zeus_read_abf(path, protocol = "C1")
+  obj <- zeus_test_obj("C1")
 
   expect_true(all(obj$traces_70$wavelength == "White"))
   expect_true(all(grepl("^White ", obj$traces_70$stim_label)))

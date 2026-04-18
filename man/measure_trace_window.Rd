@@ -30,6 +30,9 @@ window. If \code{NULL}, a default is chosen based on \code{time_reference}.}
 \item{response_window_ms}{Numeric length-2 vector for the main response
 window. If \code{NULL}, a default is chosen based on \code{time_reference}.}
 
+\item{awave_window_ms}{Numeric length-2 vector for the A-wave search window.
+If \code{NULL}, a default is chosen based on \code{time_reference}.}
+
 \item{stimulus_onset_ms}{Numeric scalar used only for absolute-time fallback
 when computing post-stimulus timing values. Default is \code{400}.}
 

@@ -4,7 +4,7 @@ test_that("protocol_table_C0 returns 70 rows", {
   expect_s3_class(x, "tbl_df")
   expect_equal(nrow(x), 70L)
   expect_equal(length(unique(x$block_index)), 10L)
-  expect_equal(table(x$block_index)[1], 7L)
+  expect_equal(unname(as.integer(table(x$block_index)[1])), 7L)
 })
 
 test_that("protocol_table_C1 returns 70 rows", {
