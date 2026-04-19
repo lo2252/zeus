@@ -1,0 +1,215 @@
+:root {
+  --zeus-water: #eaf7fb;
+  --zeus-paper: #f9fdff;
+  --zeus-ink: #12344c;
+  --zeus-ocean: #157fa8;
+  --zeus-deep: #2f5d76;
+  --zeus-foam: #5bb7d4;
+  --zeus-sand: #dceef4;
+  --zeus-border: rgba(18, 52, 76, 0.12);
+  --zeus-shadow: 0 20px 45px rgba(21, 127, 168, 0.12);
+}
+
+body {
+  background:
+    radial-gradient(circle at top right, rgba(91, 183, 212, 0.22), transparent 34%),
+    radial-gradient(circle at bottom left, rgba(21, 127, 168, 0.12), transparent 28%),
+    linear-gradient(180deg, #f5fcff 0%, var(--zeus-water) 100%);
+  color: var(--zeus-ink);
+}
+
+.zeus-app-shell {
+  padding: 1.25rem 0 2rem;
+}
+
+.zeus-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1.25rem;
+  border: 1px solid var(--zeus-border);
+  border-radius: 24px;
+  background: linear-gradient(135deg, rgba(249, 253, 255, 0.98), rgba(227, 244, 250, 0.96));
+  box-shadow: var(--zeus-shadow);
+}
+
+.zeus-hero-brand {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+.zeus-logo {
+  width: 152px;
+  max-width: 100%;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: 0 10px 24px rgba(21, 127, 168, 0.12);
+}
+
+.zeus-hero-copy h1 {
+  margin: 0;
+  color: var(--zeus-ocean);
+  font-family: "Palatino Linotype", "Book Antiqua", Palatino, serif;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.zeus-hero-copy p {
+  margin: 0.5rem 0 0;
+  max-width: 760px;
+  color: var(--zeus-ink);
+  font-size: 1rem;
+}
+
+.zeus-import-summary {
+  min-width: 250px;
+  padding: 0.85rem 1rem;
+  border-radius: 18px;
+  background: rgba(91, 183, 212, 0.09);
+  border: 1px solid rgba(21, 127, 168, 0.14);
+}
+
+.zeus-import-summary div {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.25rem;
+}
+
+.zeus-card,
+.sidebar {
+  border: 1px solid var(--zeus-border);
+  border-radius: 20px;
+  background: rgba(249, 253, 255, 0.96);
+  box-shadow: var(--zeus-shadow);
+}
+
+.sidebar {
+  background:
+    linear-gradient(180deg, rgba(249, 253, 255, 0.98), rgba(231, 246, 251, 0.96));
+}
+
+.zeus-sidebar-block {
+  margin-bottom: 1rem;
+}
+
+.btn-zeus-primary,
+.btn-zeus-secondary {
+  width: 100%;
+  border-radius: 999px;
+  border: none;
+  padding: 0.75rem 1rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.btn-zeus-primary {
+  background: linear-gradient(135deg, var(--zeus-ocean), #0f698b);
+  color: #fff;
+}
+
+.btn-zeus-secondary {
+  background: linear-gradient(135deg, var(--zeus-deep), #24485c);
+  color: #fff;
+}
+
+.btn-zeus-utility {
+  display: inline-block;
+  width: auto !important;
+  min-width: 0;
+  margin: 0;
+  padding: 0.28rem 0.72rem;
+  border-radius: 999px;
+  border: none;
+  background: rgba(91, 183, 212, 0.14);
+  color: var(--zeus-ink);
+  font-size: 0.86rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  box-shadow: none;
+}
+
+.btn-zeus-utility:hover,
+.btn-zeus-utility:focus {
+  background: rgba(91, 183, 212, 0.22);
+  color: var(--zeus-ink);
+}
+
+.zeus-card-actions {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  margin: 0 0 0.75rem;
+}
+
+.nav-tabs {
+  border-bottom: none;
+  gap: 0.35rem;
+  margin-bottom: 1rem;
+}
+
+.nav-tabs > li > a {
+  border-radius: 999px;
+  color: var(--zeus-ink);
+  border: 1px solid transparent;
+  background: rgba(91, 183, 212, 0.1);
+}
+
+.nav-tabs > li.active > a,
+.nav-tabs > li > a:hover,
+.nav-tabs > li > a:focus {
+  background: #fff;
+  color: var(--zeus-ocean);
+  border-color: rgba(21, 127, 168, 0.22);
+}
+
+.card-header,
+.accordion-header .accordion-button {
+  font-family: "Palatino Linotype", "Book Antiqua", Palatino, serif;
+  font-weight: 700;
+  color: var(--zeus-ink);
+  background: transparent;
+}
+
+.accordion-item {
+  border: 1px solid var(--zeus-border);
+  border-radius: 16px;
+  overflow: hidden;
+  margin-bottom: 0.8rem;
+}
+
+.accordion-button:not(.collapsed) {
+  color: var(--zeus-ocean);
+  background: rgba(91, 183, 212, 0.12);
+  box-shadow: none;
+}
+
+.form-control,
+.selectize-input,
+.well {
+  border-radius: 14px;
+  border-color: rgba(18, 52, 76, 0.14);
+  box-shadow: none;
+}
+
+.dataTables_wrapper .dt-buttons .btn {
+  border-radius: 999px;
+  border: none;
+  background: rgba(91, 183, 212, 0.14);
+  color: var(--zeus-ink);
+}
+
+@media (max-width: 991px) {
+  .zeus-hero {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .zeus-hero-brand {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
