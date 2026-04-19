@@ -81,6 +81,11 @@
       dplyr::mutate(stim_label = NA_character_)
   }
 
+  if (!("awave_time_poststim_ms" %in% names(features_df))) {
+    features_df <- features_df |>
+      dplyr::mutate(awave_time_poststim_ms = NA_real_)
+  }
+
   features_df |>
     tidyr::pivot_longer(
       cols = c("awave_mv", "amp_mv", "dwave_mv"),
@@ -89,7 +94,7 @@
     ) |>
     dplyr::mutate(
       latency_ms = dplyr::case_when(
-        .data$peak_metric == "awave_mv" ~ .data$trough_time_poststim_ms,
+        .data$peak_metric == "awave_mv" ~ dplyr::coalesce(.data$awave_time_poststim_ms, .data$trough_time_poststim_ms),
         .data$peak_metric == "amp_mv" ~ .data$peak_time_poststim_ms,
         .data$peak_metric == "dwave_mv" ~ .data$dpeak_time_poststim_ms,
         TRUE ~ NA_real_
@@ -105,6 +110,38 @@
         !is.na(.data$stim_label) & nzchar(.data$stim_label),
         stringr::str_extract(.data$stim_label, "^\\S+"),
         .data$wavelength
+      )
+    )
+}
+
+.zeus_home_peak_overview <- function(features_df) {
+  if (!is.data.frame(features_df) || nrow(features_df) == 0L) {
+    return(data.frame())
+  }
+
+  if (!("awave_time_poststim_ms" %in% names(features_df))) {
+    features_df <- features_df |>
+      dplyr::mutate(awave_time_poststim_ms = NA_real_)
+  }
+
+  features_df |>
+    dplyr::summarise(
+      avg_awave_trough_mv = mean(.data$awave_mv, na.rm = TRUE),
+      avg_bwave_peak_mv = mean(.data$amp_mv, na.rm = TRUE),
+      avg_dwave_peak_mv = mean(.data$dwave_mv, na.rm = TRUE),
+      avg_awave_time_ms = mean(dplyr::coalesce(.data$awave_time_poststim_ms, .data$trough_time_poststim_ms), na.rm = TRUE),
+      avg_bwave_time_ms = mean(.data$peak_time_poststim_ms, na.rm = TRUE),
+      avg_dwave_time_ms = mean(.data$dpeak_time_poststim_ms, na.rm = TRUE)
+    ) |>
+    dplyr::mutate(
+      avg_a_to_b_ms = .data$avg_bwave_time_ms - .data$avg_awave_time_ms,
+      avg_b_to_d_ms = .data$avg_dwave_time_ms - .data$avg_bwave_time_ms,
+      avg_a_to_d_ms = .data$avg_dwave_time_ms - .data$avg_awave_time_ms
+    ) |>
+    dplyr::mutate(
+      dplyr::across(
+        dplyr::everything(),
+        ~ dplyr::if_else(is.nan(.x) | is.infinite(.x), NA_real_, round(.x, 3))
       )
     )
 }
@@ -356,6 +393,7 @@ zeus_summarize_peak_statistics <- function(
     key_statistics = key_statistics,
     by_nd = by_nd,
     by_wavelength = by_wavelength,
-    combined_export = combined_export
+    combined_export = combined_export,
+    home_overview = .zeus_home_peak_overview(features_df)
   )
 }

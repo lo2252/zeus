@@ -380,6 +380,68 @@
     )
 }
 
+.zeus_waveform_marker_lines <- function(overall_df,
+                                        a_window = c(400, 700),
+                                        b_window = c(400, 700),
+                                        d_window = c(700, 1000)) {
+  if (!is.data.frame(overall_df) || nrow(overall_df) == 0L) {
+    return(tibble::tibble(
+      marker_type = factor(character(0), levels = c("A-wave trough", "B-wave peak", "D-wave peak")),
+      time_ms = numeric(0)
+    ))
+  }
+
+  b_measurements <- measure_trace_window(
+    trace_df = overall_df |>
+      dplyr::transmute(time = .data$time_ms, value = .data$signal),
+    baseline_window_ms = c(300, 400),
+    response_window_ms = b_window,
+    awave_window_ms = a_window,
+    stimulus_onset_ms = 400,
+    time_reference = "absolute",
+    trough_search_window_ms = b_window,
+    peak_search_window_ms = b_window,
+    dwave_window_ms = d_window,
+    dwave_peak_search_window_ms = d_window,
+    dwave_trough_search_window_ms = d_window
+  )
+
+  b_peak_time <- b_measurements$peak_time_ms[[1]]
+  a_window_end <- a_window[2]
+
+  if (is.finite(b_peak_time)) {
+    a_window_end <- min(a_window_end, b_peak_time)
+  }
+
+  a_measurements <- measure_trace_window(
+    trace_df = overall_df |>
+      dplyr::transmute(time = .data$time_ms, value = .data$signal),
+    baseline_window_ms = c(300, 400),
+    response_window_ms = b_window,
+    awave_window_ms = c(a_window[1], a_window_end),
+    stimulus_onset_ms = 400,
+    time_reference = "absolute",
+    trough_search_window_ms = b_window,
+    peak_search_window_ms = b_window,
+    dwave_window_ms = d_window,
+    dwave_peak_search_window_ms = d_window,
+    dwave_trough_search_window_ms = d_window
+  )
+
+  tibble::tibble(
+    marker_type = factor(
+      c("A-wave trough", "B-wave peak", "D-wave peak"),
+      levels = c("A-wave trough", "B-wave peak", "D-wave peak")
+    ),
+    time_ms = c(
+      a_measurements$awave_time_ms[[1]],
+      b_measurements$peak_time_ms[[1]],
+      b_measurements$dpeak_time_ms[[1]]
+    )
+  ) |>
+    dplyr::filter(!is.na(.data$time_ms))
+}
+
 .zeus_waveform_palette <- function(n) {
   n <- max(1L, as.integer(n))
 
@@ -838,100 +900,12 @@ zeus_plot_mean_waveform <- function(
       dplyr::arrange(.data$time_ms)
 
     if (nrow(overall_for_markers) > 0) {
-      a_marker <- overall_for_markers |>
-        dplyr::filter(.data$time_ms >= a_window[1], .data$time_ms <= a_window[2])
-
-      if (nrow(a_marker) > 0) {
-        a_marker <- a_marker |>
-          dplyr::slice_min(order_by = .data$signal, n = 1, with_ties = FALSE) |>
-          dplyr::transmute(
-            marker_type = "A-wave trough",
-            time_ms = .data$time_ms
-          )
-      } else {
-        a_marker <- tibble::tibble(marker_type = "A-wave trough", time_ms = NA_real_)
-      }
-
-      b_marker <- tibble::tibble(marker_type = "B-wave peak", time_ms = NA_real_)
-
-      if (!is.na(a_marker$time_ms[1])) {
-        b_candidates <- overall_for_markers |>
-          dplyr::filter(
-            .data$time_ms >= max(b_window[1], a_marker$time_ms[1]),
-            .data$time_ms <= b_window[2]
-          )
-
-        if (nrow(b_candidates) > 0) {
-          b_marker <- b_candidates |>
-            dplyr::slice_max(order_by = .data$signal, n = 1, with_ties = FALSE) |>
-            dplyr::transmute(
-              marker_type = "B-wave peak",
-              time_ms = .data$time_ms
-            )
-        }
-      }
-
-      if (is.na(b_marker$time_ms[1])) {
-        b_candidates <- overall_for_markers |>
-          dplyr::filter(.data$time_ms >= b_window[1], .data$time_ms <= b_window[2])
-
-        if (nrow(b_candidates) > 0) {
-          b_marker <- b_candidates |>
-            dplyr::slice_max(order_by = .data$signal, n = 1, with_ties = FALSE) |>
-            dplyr::transmute(
-              marker_type = "B-wave peak",
-              time_ms = .data$time_ms
-            )
-        }
-      }
-
-      d_marker <- tibble::tibble(marker_type = "D-wave peak", time_ms = NA_real_)
-
-      d_candidates <- overall_for_markers |>
-        dplyr::filter(.data$time_ms >= d_window[1], .data$time_ms <= d_window[2])
-
-      if (nrow(d_candidates) > 0) {
-        d_window_width <- diff(d_window)
-        d_trough_end <- d_window[1] + (d_window_width * 0.4)
-
-        d_trough_candidates <- d_candidates |>
-          dplyr::filter(.data$time_ms <= d_trough_end)
-
-        if (nrow(d_trough_candidates) > 0) {
-          d_trough <- d_trough_candidates |>
-            dplyr::slice_min(order_by = .data$signal, n = 1, with_ties = FALSE)
-
-          d_peak_candidates <- d_candidates |>
-            dplyr::filter(.data$time_ms > d_trough$time_ms)
-
-          if (nrow(d_peak_candidates) > 0) {
-            d_marker <- d_peak_candidates |>
-              dplyr::slice_max(order_by = .data$signal, n = 1, with_ties = FALSE) |>
-              dplyr::transmute(
-                marker_type = "D-wave peak",
-                time_ms = .data$time_ms
-              )
-          }
-        }
-
-        if (is.na(d_marker$time_ms[1])) {
-          d_marker <- d_candidates |>
-            dplyr::slice_max(order_by = .data$signal, n = 1, with_ties = FALSE) |>
-            dplyr::transmute(
-              marker_type = "D-wave peak",
-              time_ms = .data$time_ms
-            )
-        }
-      }
-
-      marker_lines <- dplyr::bind_rows(a_marker, b_marker, d_marker) |>
-        dplyr::filter(!is.na(.data$time_ms)) |>
-        dplyr::mutate(
-          marker_type = factor(
-            .data$marker_type,
-            levels = c("A-wave trough", "B-wave peak", "D-wave peak")
-          )
-        )
+      marker_lines <- .zeus_waveform_marker_lines(
+        overall_df = overall_for_markers,
+        a_window = a_window,
+        b_window = b_window,
+        d_window = d_window
+      )
 
       if (nrow(marker_lines) > 0) {
         p <- p +
@@ -947,11 +921,11 @@ zeus_plot_mean_waveform <- function(
             inherit.aes = FALSE
           ) +
           ggplot2::scale_linetype_manual(
-            name = "Reference lines",
+            name = "Reference Lines",
             values = c(
               "A-wave trough" = "dotted",
-              "B-wave peak" = "longdash",
-              "D-wave peak" = "dotdash"
+              "B-wave peak" = "dashed",
+              "D-wave peak" = "twodash"
             )
           )
       }
@@ -989,11 +963,11 @@ zeus_plot_mean_waveform <- function(
         )
       ),
       linetype = ggplot2::guide_legend(
-        title = "Reference lines",
+        title = "Reference Lines",
         order = 2,
         override.aes = list(
           color = marker_color,
-          linewidth = 0.9,
+          linewidth = 1.1,
           alpha = 1
         )
       ),
@@ -1018,9 +992,9 @@ zeus_plot_mean_waveform <- function(
     ) +
     .zeus_waveform_theme(base_size = base_size) +
     ggplot2::theme(
-      legend.key.width = grid::unit(1.0, "cm"),
-      legend.key.height = grid::unit(0.36, "cm"),
-      legend.spacing.y = grid::unit(0.12, "cm"),
+      legend.key.width = grid::unit(1.45, "cm"),
+      legend.key.height = grid::unit(0.5, "cm"),
+      legend.spacing.y = grid::unit(0.18, "cm"),
       legend.margin = ggplot2::margin(4, 4, 4, 4),
       legend.text = ggplot2::element_text(size = ggplot2::rel(0.82)),
       legend.title = ggplot2::element_text(size = ggplot2::rel(0.86))
