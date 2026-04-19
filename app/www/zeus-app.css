@@ -116,6 +116,35 @@ body {
   color: #fff;
 }
 
+.btn-zeus-utility {
+  display: inline-block;
+  width: auto !important;
+  min-width: 0;
+  margin: 0;
+  padding: 0.28rem 0.72rem;
+  border-radius: 999px;
+  border: none;
+  background: rgba(91, 183, 212, 0.14);
+  color: var(--zeus-ink);
+  font-size: 0.86rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  box-shadow: none;
+}
+
+.btn-zeus-utility:hover,
+.btn-zeus-utility:focus {
+  background: rgba(91, 183, 212, 0.22);
+  color: var(--zeus-ink);
+}
+
+.zeus-card-actions {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  margin: 0 0 0.75rem;
+}
+
 .nav-tabs {
   border-bottom: none;
   gap: 0.35rem;

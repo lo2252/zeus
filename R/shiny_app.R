@@ -89,6 +89,19 @@
       sem_peak_mv = round(.data$sem_peak_mv, 3),
       mean_latency_ms = round(.data$mean_latency_ms, 3),
       sd_latency_ms = round(.data$sd_latency_ms, 3)
+    ) |>
+    dplyr::rename(
+      Protocol = .data$protocol_id,
+      `Wave Type` = .data$peak_type,
+      `Sample Count` = .data$n,
+      `Mean Peak (mV)` = .data$mean_peak_mv,
+      `Peak SD (mV)` = .data$sd_peak_mv,
+      `Peak SEM (mV)` = .data$sem_peak_mv,
+      `Median Peak (mV)` = .data$median_peak_mv,
+      `Minimum Peak (mV)` = .data$min_peak_mv,
+      `Maximum Peak (mV)` = .data$max_peak_mv,
+      `Mean Latency (ms)` = .data$mean_latency_ms,
+      `Latency SD (ms)` = .data$sd_latency_ms
     )
 }
 
@@ -107,6 +120,20 @@
     intensity_plot = file.path(directory, paste0(file_stem, "_intensity_response.png")),
     csv_base = file.path(directory, file_stem)
   )
+}
+
+.zeus_app_export_stem <- function(input, item = NULL) {
+  file_stem <- trimws(.zeus_app_if_null(input$export_name, ""))
+
+  if (!nzchar(file_stem) && !is.null(item) && !is.null(item$file_name)) {
+    file_stem <- tools::file_path_sans_ext(item$file_name)
+  }
+
+  if (!nzchar(file_stem)) {
+    file_stem <- "zeus_export"
+  }
+
+  .zeus_app_sanitize_stem(file_stem)
 }
 
 .zeus_app_write_export_bundle <- function(bundle_dir,
@@ -793,6 +820,10 @@ zeus_app <- function() {
             full_screen = TRUE,
             bslib::card_header(paste(item$title, "Mean Waveform")),
             shiny::uiOutput("mean_wavelength_ui"),
+            shiny::div(
+              class = "zeus-card-actions",
+              shiny::downloadButton("download_mean_plot", "Download Mean ERG", class = "btn-zeus-utility")
+            ),
             shiny::plotOutput("mean_plot", height = "520px")
           ),
           bslib::card(
@@ -821,6 +852,10 @@ zeus_app <- function() {
           class = "zeus-card",
           full_screen = TRUE,
           bslib::card_header(paste(item$title, "Spectral Waveform")),
+          shiny::div(
+            class = "zeus-card-actions",
+            shiny::downloadButton("download_spectral_plot", "Download Spectral Waveform", class = "btn-zeus-utility")
+          ),
           shiny::plotOutput("spectral_plot", height = "760px")
         )
       })
@@ -843,6 +878,10 @@ zeus_app <- function() {
           class = "zeus-card",
           full_screen = TRUE,
           bslib::card_header(paste(item$title, "Intensity Response")),
+          shiny::div(
+            class = "zeus-card-actions",
+            shiny::downloadButton("download_intensity_plot", "Download Intensity Response", class = "btn-zeus-utility")
+          ),
           shiny::plotOutput("intensity_plot", height = "620px")
         )
       })
@@ -1025,7 +1064,10 @@ zeus_app <- function() {
           include_overall = isTRUE(input$include_overall),
           overlay_markers = isTRUE(input$overlay_markers),
           include_photocell = isTRUE(input$include_photocell),
-          wavelength_select = wavelength_select
+          wavelength_select = wavelength_select,
+          a_window = c(input$awave_window_start, input$awave_window_end),
+          b_window = c(input$peak_response_start, input$peak_response_end),
+          d_window = c(input$dwave_window_start, input$dwave_window_end)
         )
       }, res = 144)
 
@@ -1159,7 +1201,88 @@ zeus_app <- function() {
         contentType = "application/zip"
       )
 
+      output$download_mean_plot <- shiny::downloadHandler(
+        filename = function() {
+          item <- selected_item()
+          shiny::req(item)
+          paste0(.zeus_app_export_stem(input, item), "_mean_waveform.png")
+        },
+        content = function(file) {
+          item <- selected_item()
+          shiny::req(item)
+
+          slots <- .zeus_app_available_slots(item$data)
+          selected_slot <- if (!is.null(input$mean_data_slot) && input$mean_data_slot %in% slots) {
+            input$mean_data_slot
+          } else {
+            slots[[1]]
+          }
+          wavelength_select <- if (identical(item$protocol, "C0")) input$mean_wavelength else NULL
+          compare_raw <- isTRUE(input$compare_raw) &&
+            .zeus_app_can_compare_raw(item$data, selected_slot)
+
+          plot_obj <- zeus_plot_mean_waveform(
+            x = item$data,
+            data_slot = selected_slot,
+            compare_raw = compare_raw,
+            include_overall = isTRUE(input$include_overall),
+            overlay_markers = isTRUE(input$overlay_markers),
+            include_photocell = isTRUE(input$include_photocell),
+            wavelength_select = wavelength_select,
+            a_window = c(input$awave_window_start, input$awave_window_end),
+            b_window = c(input$peak_response_start, input$peak_response_end),
+            d_window = c(input$dwave_window_start, input$dwave_window_end)
+          )
+
+          ggplot2::ggsave(file, plot = plot_obj, width = 11, height = 6.5, dpi = 320, bg = "white")
+        },
+        contentType = "image/png"
+      )
+
+      output$download_spectral_plot <- shiny::downloadHandler(
+        filename = function() {
+          item <- selected_item()
+          shiny::req(item)
+          paste0(.zeus_app_export_stem(input, item), "_spectral_waveform.png")
+        },
+        content = function(file) {
+          item <- selected_item()
+          shiny::req(item)
+
+          plot_obj <- zeus_plot_spectral_waveform(
+            x = item$data,
+            include_photocell = isTRUE(input$include_photocell)
+          )
+
+          ggplot2::ggsave(file, plot = plot_obj, width = 14, height = 9, dpi = 320, bg = "white")
+        },
+        contentType = "image/png"
+      )
+
+      output$download_intensity_plot <- shiny::downloadHandler(
+        filename = function() {
+          item <- selected_item()
+          shiny::req(item)
+          paste0(.zeus_app_export_stem(input, item), "_intensity_response.png")
+        },
+        content = function(file) {
+          item <- selected_item()
+          shiny::req(item)
+
+          plot_obj <- zeus_plot_intensity_response(
+            x = item$data,
+            use_se = isTRUE(input$use_se)
+          )
+
+          ggplot2::ggsave(file, plot = plot_obj, width = 11, height = 6.5, dpi = 320, bg = "white")
+        },
+        contentType = "image/png"
+      )
+
       shiny::outputOptions(output, "download_csv_bundle", suspendWhenHidden = FALSE)
+      shiny::outputOptions(output, "download_mean_plot", suspendWhenHidden = FALSE)
+      shiny::outputOptions(output, "download_spectral_plot", suspendWhenHidden = FALSE)
+      shiny::outputOptions(output, "download_intensity_plot", suspendWhenHidden = FALSE)
     }
   )
 }

@@ -21,6 +21,15 @@ test_that("app export path helper creates expected file names", {
   expect_equal(out$csv_base, file.path("results", "fish01"))
 })
 
+test_that("app export stem prefers export name and falls back to item file name", {
+  input <- list(export_name = "adult fish 01")
+  item <- list(file_name = "recording.abf")
+
+  expect_equal(.zeus_app_export_stem(input, item), "adult_fish_01")
+  expect_equal(.zeus_app_export_stem(list(export_name = ""), item), "recording")
+  expect_equal(.zeus_app_export_stem(list(export_name = ""), NULL), "zeus_export")
+})
+
 test_that("peak settings helper includes awave window", {
   input <- list(
     peak_baseline_start = 300,
@@ -39,6 +48,43 @@ test_that("peak settings helper includes awave window", {
   out <- .zeus_app_peak_settings(input)
 
   expect_equal(out$awave_window_ms, c(400, 700))
+})
+
+test_that("peak summary helper formats readable average-peaks column names", {
+  stats_list <- list(
+    key_statistics = data.frame(
+      protocol_id = "C1",
+      peak_type = "A-wave",
+      n = 4,
+      mean_peak_mv = -4.321,
+      sd_peak_mv = 0.456,
+      sem_peak_mv = 0.228,
+      median_peak_mv = -4.300,
+      min_peak_mv = -4.900,
+      max_peak_mv = -3.800,
+      mean_latency_ms = 22.5,
+      sd_latency_ms = 1.2
+    )
+  )
+
+  out <- .zeus_app_peak_summary_table(stats_list)
+
+  expect_equal(
+    names(out),
+    c(
+      "Protocol",
+      "Wave Type",
+      "Sample Count",
+      "Mean Peak (mV)",
+      "Peak SD (mV)",
+      "Peak SEM (mV)",
+      "Median Peak (mV)",
+      "Minimum Peak (mV)",
+      "Maximum Peak (mV)",
+      "Mean Latency (ms)",
+      "Latency SD (ms)"
+    )
+  )
 })
 
 test_that("full fish protocol defaults and labels are assigned predictably", {
