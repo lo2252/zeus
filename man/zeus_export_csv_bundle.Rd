@@ -4,13 +4,16 @@
 \alias{zeus_export_csv_bundle}
 \title{Export ZEUS data sources as CSV files}
 \usage{
-zeus_export_csv_bundle(x, csv_path)
+zeus_export_csv_bundle(x, csv_path, components = NULL)
 }
 \arguments{
 \item{x}{A named list or ZEUS object containing one or more supported
 components.}
 
 \item{csv_path}{Base path used for the output file names.}
+
+\item{components}{Optional character vector of supported ZEUS components to
+include. Defaults to all supported components present in \code{x}.}
 }
 \value{
 Invisibly returns a named character vector of written file paths.

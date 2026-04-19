@@ -12,12 +12,24 @@
   )
 }
 
-.zeus_collect_export_components <- function(x) {
+.zeus_collect_export_components <- function(x, components = NULL) {
   if (!is.list(x)) {
     stop("`x` must be a named list or ZEUS object.", call. = FALSE)
   }
 
   supported_names <- .zeus_supported_export_names()
+  if (!is.null(components)) {
+    components <- intersect(as.character(components), supported_names)
+    if (length(components) == 0L) {
+      stop(
+        "`components` must include at least one supported export component: ",
+        paste(supported_names, collapse = ", "),
+        call. = FALSE
+      )
+    }
+    supported_names <- components
+  }
+
   present_names <- intersect(names(x), supported_names)
 
   if (!("peak_statistics" %in% present_names)) {
@@ -63,10 +75,12 @@
 #' @param x A named list or ZEUS object containing one or more supported
 #'   components.
 #' @param csv_path Base path used for the output file names.
+#' @param components Optional character vector of supported ZEUS components to
+#'   include. Defaults to all supported components present in `x`.
 #'
 #' @return Invisibly returns a named character vector of written file paths.
 #' @export
-zeus_export_csv_bundle <- function(x, csv_path) {
+zeus_export_csv_bundle <- function(x, csv_path, components = NULL) {
   if (!is.character(csv_path) || length(csv_path) != 1L || !nzchar(csv_path)) {
     stop("`csv_path` must be a single non-empty character string.", call. = FALSE)
   }
@@ -79,7 +93,7 @@ zeus_export_csv_bundle <- function(x, csv_path) {
   }
 
   written_paths <- character(0)
-  export_components <- .zeus_collect_export_components(x)
+  export_components <- .zeus_collect_export_components(x, components = components)
 
   for (name in names(export_components)) {
     export_df <- export_components[[name]]
@@ -384,10 +398,12 @@ zeus_export_csv_bundle <- function(x, csv_path) {
 #' @param x A named list or ZEUS object containing one or more supported
 #'   components.
 #' @param xlsx_path Output path for the `.xlsx` workbook.
+#' @param components Optional character vector of supported ZEUS components to
+#'   include. Defaults to all supported components present in `x`.
 #'
 #' @return Invisibly returns `xlsx_path`.
 #' @export
-zeus_export_excel_workbook <- function(x, xlsx_path) {
+zeus_export_excel_workbook <- function(x, xlsx_path, components = NULL) {
   if (!is.character(xlsx_path) || length(xlsx_path) != 1L || !nzchar(xlsx_path)) {
     stop("`xlsx_path` must be a single non-empty character string.", call. = FALSE)
   }
@@ -397,7 +413,7 @@ zeus_export_excel_workbook <- function(x, xlsx_path) {
     dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
   }
 
-  sheets <- .zeus_collect_export_components(x)
+  sheets <- .zeus_collect_export_components(x, components = components)
   .zeus_write_simple_xlsx(sheets = sheets, xlsx_path = xlsx_path)
   invisible(xlsx_path)
 }

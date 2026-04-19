@@ -6,6 +6,8 @@ Authors@R:
 Description: What the package does (one paragraph).
 License: MIT + file LICENSE
 Encoding: UTF-8
+Depends:
+    R (>= 4.1.0)
 Imports:
     bslib,
     dplyr,
@@ -25,5 +27,6 @@ Imports:
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3
 Suggests: 
+    rstudioapi,
     testthat (>= 3.0.0)
 Config/testthat/edition: 3

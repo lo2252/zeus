@@ -111,7 +111,6 @@
 
 .zeus_app_write_export_bundle <- function(bundle_dir,
                                           file_stem,
-                                          export_format,
                                           mean_plot,
                                           spectral_plot,
                                           intensity_plot,
@@ -123,12 +122,7 @@
   ggplot2::ggsave(export_paths$mean_plot, plot = mean_plot, width = 11, height = 6.5, dpi = 320, bg = "white")
   ggplot2::ggsave(export_paths$spectral_plot, plot = spectral_plot, width = 14, height = 9, dpi = 320, bg = "white")
   ggplot2::ggsave(export_paths$intensity_plot, plot = intensity_plot, width = 11, height = 6.5, dpi = 320, bg = "white")
-
-  if (identical(export_format, "excel")) {
-    zeus_export_excel_workbook(x, file.path(bundle_dir, paste0(file_stem, "_data.xlsx")))
-  } else {
-    zeus_export_csv_bundle(x, export_paths$csv_base)
-  }
+  zeus_export_csv_bundle(x, export_paths$csv_base)
 
   invisible(export_paths)
 }
@@ -181,6 +175,120 @@
 
   df <- x[[data_slot]]
   is.data.frame(df) && "value_raw" %in% names(df)
+}
+
+.zeus_app_available_slots <- function(x) {
+  if (is.null(x) || !is.list(x)) {
+    return("traces_70")
+  }
+
+  out <- c()
+  if (is.data.frame(x$traces_70)) {
+    out <- c(out, "traces_70")
+  }
+  if (is.data.frame(x$traces_280)) {
+    out <- c(out, "traces_280")
+  }
+
+  if (length(out) == 0L) {
+    "traces_70"
+  } else {
+    out
+  }
+}
+
+.zeus_app_sanitize_stem <- function(x) {
+  x <- gsub("[^A-Za-z0-9_-]+", "_", x)
+  x <- gsub("_+", "_", x)
+  x <- gsub("^_|_$", "", x)
+
+  if (!nzchar(x)) {
+    "file"
+  } else {
+    x
+  }
+}
+
+.zeus_app_if_null <- function(x, y) {
+  if (is.null(x)) y else x
+}
+
+.zeus_app_default_protocols <- function(n_files, analysis_mode = "single") {
+  if (identical(analysis_mode, "full_fish")) {
+    defaults <- c("C1", rep("C0", max(0L, n_files - 1L)))
+    defaults[seq_len(n_files)]
+  } else {
+    rep("C1", n_files)
+  }
+}
+
+.zeus_app_collect_protocols <- function(input, files, analysis_mode = "single") {
+  if (is.null(files) || nrow(files) == 0L) {
+    return(character(0))
+  }
+
+  if (!identical(analysis_mode, "full_fish")) {
+    return(rep(.zeus_app_if_null(input$protocol_single, "C1"), nrow(files)))
+  }
+
+  defaults <- .zeus_app_default_protocols(nrow(files), analysis_mode = "full_fish")
+  vapply(
+    seq_len(nrow(files)),
+    function(i) {
+      .zeus_app_if_null(input[[paste0("protocol_file_", i)]], defaults[[i]])
+    },
+    character(1)
+  )
+}
+
+.zeus_app_validate_protocols <- function(protocols, analysis_mode = "single") {
+  if (!identical(analysis_mode, "full_fish")) {
+    return(NULL)
+  }
+
+  if (length(protocols) != 3L) {
+    return("Full Fish Analysis requires exactly 3 ABF files.")
+  }
+
+  protocol_counts <- table(protocols)
+  c1_n <- if ("C1" %in% names(protocol_counts)) unname(protocol_counts[["C1"]]) else 0L
+  c0_n <- if ("C0" %in% names(protocol_counts)) unname(protocol_counts[["C0"]]) else 0L
+
+  if (!identical(c1_n, 1L) || !identical(c0_n, 2L)) {
+    return("Full Fish Analysis requires exactly 1 C1 file and 2 C0 files.")
+  }
+
+  NULL
+}
+
+.zeus_app_make_item_labels <- function(protocols) {
+  protocol_index <- ave(seq_along(protocols), protocols, FUN = seq_along)
+  protocol_n <- ave(seq_along(protocols), protocols, FUN = length)
+
+  vapply(
+    seq_along(protocols),
+    function(i) {
+      if (protocol_n[[i]] <= 1L) {
+        protocols[[i]]
+      } else {
+        paste(protocols[[i]], LETTERS[[protocol_index[[i]]]])
+      }
+    },
+    character(1)
+  )
+}
+
+.zeus_app_find_item <- function(bundle, id) {
+  if (is.null(bundle) || is.null(bundle$items) || length(bundle$items) == 0L) {
+    return(NULL)
+  }
+
+  idx <- match(id, vapply(bundle$items, `[[`, character(1), "id"))
+  if (is.na(idx)) {
+    return(NULL)
+  }
+
+  bundle$items[[idx]]
 }
 
 .zeus_app_choose_directory <- function(current = "") {
@@ -272,12 +380,12 @@
 .zeus_app_theme <- function() {
   bslib::bs_theme(
     version = 5,
-    bg = "#F6F1E8",
-    fg = "#14253D",
-    primary = "#C42E4E",
-    secondary = "#253B6F",
-    success = "#6A8C69",
-    info = "#385D8A",
+    bg = "#EAF7FB",
+    fg = "#12344C",
+    primary = "#157FA8",
+    secondary = "#2F5D76",
+    success = "#2F8C8C",
+    info = "#5BB7D4",
     base_font = "Georgia",
     heading_font = "Palatino Linotype",
     code_font = "Courier New"
@@ -304,22 +412,52 @@
   shiny::tagList(
     shiny::div(
       class = "zeus-sidebar-block",
+      shiny::radioButtons(
+        "analysis_mode",
+        "Analysis mode",
+        choices = c("Single File" = "single", "Full Fish Analysis" = "full_fish"),
+        selected = "single",
+        inline = TRUE
+      ),
       shiny::fileInput(
         "abf_file",
         "ABF File",
-        accept = c(".abf")
+        accept = c(".abf"),
+        multiple = TRUE
       ),
-      shiny::selectInput(
-        "protocol",
-        "Protocol",
-        choices = c("C0", "C1"),
-        selected = "C1"
-      ),
+      shiny::uiOutput("protocol_assignment_ui"),
       shiny::actionButton("import_file", "Import File", class = "btn-zeus-primary")
     ),
     bslib::accordion(
       id = "zeus_controls",
-      open = c("Import Settings", "Plot Settings", "Peak Settings", "Export"),
+      open = c("Peak Settings", "Import Settings", "Plot Settings", "Export"),
+      bslib::accordion_panel(
+        "Peak Settings",
+        shiny::selectInput(
+          "time_reference",
+          "Time reference",
+          choices = c("absolute", "stimulus"),
+          selected = "absolute"
+        ),
+        shiny::numericInput("stimulus_onset_ms", "Stimulus onset (ms)", value = 400, step = 1),
+        shiny::checkboxInput("same_sign", "Force consistent B-wave sign", value = TRUE),
+        shiny::fluidRow(
+          shiny::column(6, shiny::numericInput("peak_baseline_start", "Baseline start (ms)", value = 300)),
+          shiny::column(6, shiny::numericInput("peak_baseline_end", "Baseline end (ms)", value = 400))
+        ),
+        shiny::fluidRow(
+          shiny::column(6, shiny::numericInput("peak_response_start", "Response start (ms)", value = 400)),
+          shiny::column(6, shiny::numericInput("peak_response_end", "Response end (ms)", value = 700))
+        ),
+        shiny::fluidRow(
+          shiny::column(6, shiny::numericInput("awave_window_start", "A-wave start (ms)", value = 400)),
+          shiny::column(6, shiny::numericInput("awave_window_end", "A-wave end (ms)", value = 700))
+        ),
+        shiny::fluidRow(
+          shiny::column(6, shiny::numericInput("dwave_window_start", "D-wave start (ms)", value = 700)),
+          shiny::column(6, shiny::numericInput("dwave_window_end", "D-wave end (ms)", value = 1000))
+        )
+      ),
       bslib::accordion_panel(
         "Import Settings",
         shiny::textInput("erg_channel", "ERG Channel", value = "ERG DAM80"),
@@ -352,57 +490,12 @@
       ),
       bslib::accordion_panel(
         "Plot Settings",
-        shiny::selectInput(
-          "mean_data_slot",
-          "Mean waveform source",
-          choices = c("traces_70", "traces_280"),
-          selected = "traces_70"
-        ),
-        shiny::uiOutput("mean_wavelength_ui"),
-        shiny::uiOutput("compare_raw_ui"),
-        shiny::checkboxInput("include_overall", "Include overall mean trace", value = TRUE),
-        shiny::checkboxInput("overlay_markers", "Overlay waveform markers", value = FALSE),
-        shiny::checkboxInput("include_photocell", "Include photocell overlay", value = TRUE),
-        shiny::checkboxInput("use_se", "Show SE on intensity response", value = TRUE)
-      ),
-      bslib::accordion_panel(
-        "Peak Settings",
-        shiny::selectInput(
-          "time_reference",
-          "Time reference",
-          choices = c("absolute", "stimulus"),
-          selected = "absolute"
-        ),
-        shiny::numericInput("stimulus_onset_ms", "Stimulus onset (ms)", value = 400, step = 1),
-        shiny::checkboxInput("same_sign", "Force consistent B-wave sign", value = TRUE),
-        shiny::fluidRow(
-          shiny::column(6, shiny::numericInput("peak_baseline_start", "Baseline start (ms)", value = 300)),
-          shiny::column(6, shiny::numericInput("peak_baseline_end", "Baseline end (ms)", value = 400))
-        ),
-        shiny::fluidRow(
-          shiny::column(6, shiny::numericInput("peak_response_start", "Response start (ms)", value = 400)),
-          shiny::column(6, shiny::numericInput("peak_response_end", "Response end (ms)", value = 700))
-        ),
-        shiny::fluidRow(
-          shiny::column(6, shiny::numericInput("awave_window_start", "A-wave start (ms)", value = 400)),
-          shiny::column(6, shiny::numericInput("awave_window_end", "A-wave end (ms)", value = 700))
-        ),
-        shiny::fluidRow(
-          shiny::column(6, shiny::numericInput("dwave_window_start", "D-wave start (ms)", value = 700)),
-          shiny::column(6, shiny::numericInput("dwave_window_end", "D-wave end (ms)", value = 1000))
-        )
+        shiny::uiOutput("plot_settings_ui")
       ),
       bslib::accordion_panel(
         "Export",
-        shiny::radioButtons(
-          "export_format",
-          "Data export format",
-          choices = c("CSV bundle" = "csv", "Excel workbook" = "excel"),
-          selected = "csv",
-          inline = TRUE
-        ),
         shiny::textInput("export_name", "Export file name", value = ""),
-        shiny::downloadButton("download_bundle", "Download Data and Plots", class = "btn-zeus-secondary"),
+        shiny::downloadButton("download_csv_bundle", "Download CSV Bundle", class = "btn-zeus-secondary"),
         shiny::tags$div(
           style = "font-size: 0.9rem; color: #6b7280; margin-top: 0.5rem;",
           "Your browser will ask where to save the export zip file."
@@ -470,49 +563,26 @@ zeus_app <- function() {
               open = "desktop",
               .zeus_app_sidebar()
             ),
-            shiny::tabsetPanel(
-              id = "zeus_main_tabs",
-              type = "tabs",
-              shiny::tabPanel(
-                "Home",
-                bslib::card(
-                  class = "zeus-card",
-                  full_screen = TRUE,
-                  bslib::card_header("Mean Waveform"),
-                  shiny::plotOutput("mean_plot", height = "520px")
+            shiny::tagList(
+              shiny::uiOutput("selected_file_ui"),
+              shiny::tabsetPanel(
+                id = "zeus_main_tabs",
+                type = "tabs",
+                shiny::tabPanel(
+                  "Home",
+                  shiny::uiOutput("home_tab_ui")
                 ),
-                bslib::card(
-                  class = "zeus-card",
-                  bslib::card_header("Average Peaks"),
-                  DT::DTOutput("average_peaks_table")
-                )
-              ),
-              shiny::tabPanel(
-                "Spectral Waveform",
-                bslib::card(
-                  class = "zeus-card",
-                  full_screen = TRUE,
-                  bslib::card_header("Spectral Waveform"),
-                  shiny::plotOutput("spectral_plot", height = "760px")
-                )
-              ),
-              shiny::tabPanel(
-                "Intensity Response",
-                bslib::card(
-                  class = "zeus-card",
-                  full_screen = TRUE,
-                  bslib::card_header("Intensity Response"),
-                  shiny::plotOutput("intensity_plot", height = "620px")
-                )
-              ),
-              shiny::tabPanel(
-                "Peak Statistics",
-                bslib::navset_card_pill(
-                  title = "Summary Tables",
-                  bslib::nav_panel("Key Statistics", DT::DTOutput("key_statistics_table")),
-                  bslib::nav_panel("By ND", DT::DTOutput("by_nd_table")),
-                  bslib::nav_panel("By Wavelength", DT::DTOutput("by_wavelength_table")),
-                  bslib::nav_panel("Combined Export", DT::DTOutput("combined_statistics_table"))
+                shiny::tabPanel(
+                  "Spectral Waveform",
+                  shiny::uiOutput("spectral_tab_ui")
+                ),
+                shiny::tabPanel(
+                  "Intensity Response",
+                  shiny::uiOutput("intensity_tab_ui")
+                ),
+                shiny::tabPanel(
+                  "Peak Statistics",
+                  shiny::uiOutput("statistics_tab_ui")
                 )
               )
             )
@@ -523,52 +593,118 @@ zeus_app <- function() {
     server = function(input, output, session) {
       imported_data <- shiny::reactiveVal(NULL)
       import_status <- shiny::reactiveVal("Waiting for file import.")
+      
+      output$protocol_assignment_ui <- shiny::renderUI({
+        files <- input$abf_file
+        mode <- .zeus_app_if_null(input$analysis_mode, "single")
 
-      output$mean_wavelength_ui <- shiny::renderUI({
-        if (is.null(imported_data()) && !identical(input$protocol, "C0")) {
-          return(NULL)
+        if (identical(mode, "single")) {
+          return(
+            shiny::selectInput(
+              "protocol_single",
+              "Protocol",
+              choices = c("C0", "C1"),
+              selected = .zeus_app_if_null(input$protocol_single, "C1")
+            )
+          )
         }
 
-        if (!identical(input$protocol, "C0")) {
-          return(NULL)
+        if (is.null(files) || nrow(files) == 0L) {
+          return(
+            shiny::tags$div(
+              style = "font-size: 0.92rem; color: #5b6b75;",
+              "Full Fish Analysis requires 3 files assigned as 1 C1 and 2 C0."
+            )
+          )
         }
 
-        choices <- .zeus_app_available_wavelengths(imported_data())
-        if (length(choices) == 0L) {
-          choices <- "450"
-        }
-
-        shiny::selectInput(
-          "mean_wavelength",
-          "C0 waveform block",
-          choices = choices,
-          selected = choices[[1]]
+        defaults <- .zeus_app_default_protocols(nrow(files), analysis_mode = "full_fish")
+        shiny::tagList(
+          shiny::tags$div(
+            style = "font-size: 0.92rem; color: #5b6b75; margin-bottom: 0.5rem;",
+            "Assign 1 C1 and 2 C0 files for each fish."
+          ),
+          lapply(seq_len(nrow(files)), function(i) {
+            shiny::selectInput(
+              inputId = paste0("protocol_file_", i),
+              label = paste("Protocol for", files$name[[i]]),
+              choices = c("C0", "C1"),
+              selected = .zeus_app_if_null(input[[paste0("protocol_file_", i)]], defaults[[i]])
+            )
+          })
         )
       })
 
-      output$compare_raw_ui <- shiny::renderUI({
-        data_slot <- if (!is.null(input$mean_data_slot)) input$mean_data_slot else "traces_70"
-        can_compare <- .zeus_app_can_compare_raw(imported_data(), data_slot)
+      output$plot_settings_ui <- shiny::renderUI({
+        bundle <- imported_data()
+
+        if (is.null(bundle) || length(bundle$items) == 0L) {
+          return(
+            shiny::tags$div(
+              style = "font-size: 0.95rem; color: #6b7280;",
+              "Import a file to load plot options."
+            )
+          )
+        }
+
+        available_slots <- unique(unlist(lapply(bundle$items, function(item) {
+          .zeus_app_available_slots(item$data)
+        })))
+
+        selected_slot <- if (!is.null(input$mean_data_slot) && input$mean_data_slot %in% available_slots) {
+          input$mean_data_slot
+        } else {
+          available_slots[[1]]
+        }
+        can_compare <- any(vapply(bundle$items, function(item) {
+          .zeus_app_can_compare_raw(item$data, selected_slot)
+        }, logical(1)))
 
         shiny::tagList(
+          shiny::selectInput(
+            "mean_data_slot",
+            "Mean waveform source",
+            choices = stats::setNames(available_slots, available_slots),
+            selected = selected_slot
+          ),
           shiny::checkboxInput(
             "compare_raw",
             "Compare raw and smoothed mean traces",
-            value = FALSE
+            value = isTRUE(input$compare_raw) && can_compare
           ),
           if (!can_compare) {
             shiny::tags$div(
               style = "font-size: 0.9rem; color: #6b7280; margin-top: -0.25rem;",
               "Raw-vs-smoothed comparison is only available when the selected data includes raw traces."
             )
-          }
+          },
+          shiny::checkboxInput(
+            "include_overall",
+            "Include overall mean trace",
+            value = if (!is.null(input$include_overall)) isTRUE(input$include_overall) else TRUE
+          ),
+          shiny::checkboxInput(
+            "overlay_markers",
+            "Overlay waveform markers",
+            value = if (!is.null(input$overlay_markers)) isTRUE(input$overlay_markers) else FALSE
+          ),
+          shiny::checkboxInput(
+            "include_photocell",
+            "Include photocell overlay",
+            value = if (!is.null(input$include_photocell)) isTRUE(input$include_photocell) else TRUE
+          ),
+          shiny::checkboxInput(
+            "use_se",
+            "Show SE on intensity response",
+            value = if (!is.null(input$use_se)) isTRUE(input$use_se) else TRUE
+          )
         )
       })
 
       output$import_summary <- shiny::renderUI({
-        x <- imported_data()
+        bundle <- imported_data()
 
-        if (is.null(x)) {
+        if (is.null(bundle) || length(bundle$items) == 0L) {
           return(
             shiny::div(
               class = "zeus-import-summary",
@@ -578,48 +714,238 @@ zeus_app <- function() {
           )
         }
 
-        file_label <- if (!is.null(x$source_file_name) && nzchar(x$source_file_name)) {
-          x$source_file_name
-        } else {
-          basename(if (!is.null(x$path)) x$path else "")
-        }
-        protocol_label <- if (!is.null(x$protocol)) x$protocol else input$protocol
-        stim_n <- if (!is.null(x$traces_70)) dplyr::n_distinct(x$traces_70$stim_index) else NA_integer_
-        sweep_n <- if (!is.null(x$traces_280)) dplyr::n_distinct(x$traces_280$sweep) else NA_integer_
+        summary_rows <- lapply(bundle$items, function(item) {
+          stim_n <- if (!is.null(item$data$traces_70)) dplyr::n_distinct(item$data$traces_70$stim_index) else NA_integer_
+          sweep_n <- if (!is.null(item$data$traces_280)) dplyr::n_distinct(item$data$traces_280$sweep) else NA_integer_
+
+          shiny::tags$div(
+            shiny::strong(paste0(item$label, ":")),
+            shiny::span(paste(item$file_name, "| stimuli", stim_n, "| sweeps", sweep_n))
+          )
+        })
 
         shiny::div(
           class = "zeus-import-summary",
           shiny::div(shiny::strong("Status:"), shiny::span(import_status())),
-          shiny::div(shiny::strong("Loaded file:"), shiny::span(file_label)),
-          shiny::div(shiny::strong("Protocol:"), shiny::span(protocol_label)),
-          shiny::div(shiny::strong("Stimuli:"), shiny::span(stim_n)),
-          shiny::div(shiny::strong("Sweeps:"), shiny::span(sweep_n))
+          shiny::div(shiny::strong("Analysis:"), shiny::span(bundle$analysis_label)),
+          shiny::div(shiny::strong("Files loaded:"), shiny::span(length(bundle$items))),
+          summary_rows
         )
       })
+
+      output$selected_file_ui <- shiny::renderUI({
+        bundle <- imported_data()
+
+        if (is.null(bundle) || length(bundle$items) <= 1L) {
+          return(NULL)
+        }
+
+        choices <- stats::setNames(
+          vapply(bundle$items, `[[`, character(1), "id"),
+          vapply(bundle$items, `[[`, character(1), "title")
+        )
+
+        shiny::div(
+          class = "zeus-card",
+          style = "padding: 0.85rem 1rem; margin-bottom: 1rem;",
+          shiny::selectInput(
+            "selected_file_id",
+            "Selected file",
+            choices = choices,
+            selected = .zeus_app_if_null(input$selected_file_id, bundle$items[[1]]$id)
+          )
+        )
+      })
+
+      selected_item <- shiny::reactive({
+        bundle <- imported_data()
+        if (is.null(bundle) || length(bundle$items) == 0L) {
+          return(NULL)
+        }
+
+        if (length(bundle$items) == 1L) {
+          return(bundle$items[[1]])
+        }
+
+        selected_id <- .zeus_app_if_null(input$selected_file_id, bundle$items[[1]]$id)
+        item <- .zeus_app_find_item(bundle, selected_id)
+
+        if (is.null(item)) bundle$items[[1]] else item
+      })
+
+      output$home_tab_ui <- shiny::renderUI({
+        item <- selected_item()
+
+        if (is.null(item)) {
+          return(
+            bslib::card(
+              class = "zeus-card",
+              full_screen = TRUE,
+              bslib::card_header("Mean Waveform"),
+              shiny::plotOutput("home_placeholder_plot", height = "520px")
+            )
+          )
+        }
+
+        shiny::tagList(
+          bslib::card(
+            class = "zeus-card",
+            full_screen = TRUE,
+            bslib::card_header(paste(item$title, "Mean Waveform")),
+            shiny::uiOutput("mean_wavelength_ui"),
+            shiny::plotOutput("mean_plot", height = "520px")
+          ),
+          bslib::card(
+            class = "zeus-card",
+            bslib::card_header(paste(item$title, "Average Peaks")),
+            DT::DTOutput("average_peaks_table")
+          )
+        )
+      })
+
+      output$spectral_tab_ui <- shiny::renderUI({
+        item <- selected_item()
+
+        if (is.null(item)) {
+          return(
+            bslib::card(
+              class = "zeus-card",
+              full_screen = TRUE,
+              bslib::card_header("Spectral Waveform"),
+              shiny::plotOutput("spectral_placeholder_plot", height = "760px")
+            )
+          )
+        }
+
+        bslib::card(
+          class = "zeus-card",
+          full_screen = TRUE,
+          bslib::card_header(paste(item$title, "Spectral Waveform")),
+          shiny::plotOutput("spectral_plot", height = "760px")
+        )
+      })
+
+      output$intensity_tab_ui <- shiny::renderUI({
+        item <- selected_item()
+
+        if (is.null(item)) {
+          return(
+            bslib::card(
+              class = "zeus-card",
+              full_screen = TRUE,
+              bslib::card_header("Intensity Response"),
+              shiny::plotOutput("intensity_placeholder_plot", height = "620px")
+            )
+          )
+        }
+
+        bslib::card(
+          class = "zeus-card",
+          full_screen = TRUE,
+          bslib::card_header(paste(item$title, "Intensity Response")),
+          shiny::plotOutput("intensity_plot", height = "620px")
+        )
+      })
+
+      output$statistics_tab_ui <- shiny::renderUI({
+        item <- selected_item()
+
+        if (is.null(item)) {
+          return(
+            bslib::card(
+              class = "zeus-card",
+              bslib::card_header("Summary Tables"),
+              shiny::tags$p("Import a file to review peak statistics.")
+            )
+          )
+        }
+
+        bslib::navset_card_pill(
+          title = paste(item$title, "Summary Tables"),
+          bslib::nav_panel("Key Statistics", DT::DTOutput("key_statistics_table")),
+          bslib::nav_panel("By ND", DT::DTOutput("by_nd_table")),
+          bslib::nav_panel("By Wavelength", DT::DTOutput("by_wavelength_table")),
+          bslib::nav_panel("Combined Export", DT::DTOutput("combined_statistics_table"))
+        )
+      })
+
+      output$home_placeholder_plot <- shiny::renderPlot({
+        .zeus_app_placeholder_plot("Import an ABF file to view the mean waveform.")
+      }, res = 144)
+
+      output$spectral_placeholder_plot <- shiny::renderPlot({
+        .zeus_app_placeholder_plot("Import an ABF file to view the spectral waveform panel.")
+      }, res = 144)
+
+      output$intensity_placeholder_plot <- shiny::renderPlot({
+        .zeus_app_placeholder_plot("Import an ABF file to view the intensity-response plot.")
+      }, res = 144)
 
       shiny::observeEvent(input$import_file, {
         shiny::req(input$abf_file)
 
+        files <- input$abf_file
+        mode <- .zeus_app_if_null(input$analysis_mode, "single")
+        protocols <- .zeus_app_collect_protocols(input, files, analysis_mode = mode)
+        validation_error <- .zeus_app_validate_protocols(protocols, analysis_mode = mode)
+
+        if (!is.null(validation_error)) {
+          imported_data(NULL)
+          import_status(validation_error)
+          shiny::showNotification(validation_error, type = "error", duration = NULL)
+          return()
+        }
+
+        if (identical(mode, "single") && nrow(files) != 1L) {
+          message_text <- "Single File mode requires exactly 1 ABF file."
+          imported_data(NULL)
+          import_status(message_text)
+          shiny::showNotification(message_text, type = "error", duration = NULL)
+          return()
+        }
+
         settings <- .zeus_app_import_settings(input)
         import_status("Importing file...")
+        item_labels <- .zeus_app_make_item_labels(protocols)
 
         result <- tryCatch(
-          shiny::withProgress(message = "Importing ABF file", value = 0.15, {
-            shiny::incProgress(0.2, detail = "Reading ABF data")
+          shiny::withProgress(message = "Importing ABF file", value = 0.05, {
+            imported_items <- vector("list", length = nrow(files))
 
-            x <- do.call(
-              zeus_read_abf,
-              c(
-                list(
-                  path = input$abf_file$datapath,
-                  protocol = input$protocol
-                ),
-                settings
+            for (i in seq_len(nrow(files))) {
+              shiny::incProgress(
+                amount = 0.8 / nrow(files),
+                detail = paste("Reading", files$name[[i]])
               )
-            )
 
-            shiny::incProgress(0.8, detail = "Preparing plots and summaries")
-            .zeus_app_attach_source_info(x, file_name = input$abf_file$name)
+              x <- do.call(
+                zeus_read_abf,
+                c(
+                  list(
+                    path = files$datapath[[i]],
+                    protocol = protocols[[i]]
+                  ),
+                  settings
+                )
+              )
+
+              x <- .zeus_app_attach_source_info(x, file_name = files$name[[i]])
+              imported_items[[i]] <- list(
+                id = paste0("file", i),
+                label = item_labels[[i]],
+                title = paste(item_labels[[i]], files$name[[i]], sep = " | "),
+                file_name = files$name[[i]],
+                protocol = protocols[[i]],
+                data = x
+              )
+            }
+
+            shiny::incProgress(0.15, detail = "Preparing plots and summaries")
+            list(
+              analysis_mode = mode,
+              analysis_label = if (identical(mode, "full_fish")) "Full Fish Analysis" else "Single File",
+              items = imported_items
+            )
           }),
           error = function(e) e
         )
@@ -639,16 +965,6 @@ zeus_app <- function() {
         import_status("Import complete.")
         shiny::updateCheckboxInput(session, "compare_raw", value = FALSE)
 
-        choices <- .zeus_app_available_wavelengths(imported_data())
-        if (length(choices) > 0L) {
-          shiny::updateSelectInput(
-            session,
-            "mean_wavelength",
-            choices = choices,
-            selected = choices[[1]]
-          )
-        }
-
         shiny::showNotification("ABF file imported successfully.", type = "message")
       }, ignoreInit = TRUE)
 
@@ -656,94 +972,108 @@ zeus_app <- function() {
         shiny::stopApp(invisible(NULL))
       }, ignoreInit = TRUE)
 
-      peak_statistics <- shiny::reactive({
-        x <- imported_data()
-        shiny::req(x)
+      current_stats <- shiny::reactive({
+        item <- selected_item()
+        shiny::req(item)
 
         do.call(
           zeus_summarize_peak_statistics,
-          c(list(x = x), .zeus_app_peak_settings(input))
+          c(list(x = item$data), .zeus_app_peak_settings(input))
         )
       })
 
-      mean_plot_obj <- shiny::reactive({
-        x <- imported_data()
-        if (is.null(x)) {
+      output$mean_wavelength_ui <- shiny::renderUI({
+        item <- selected_item()
+        if (is.null(item) || !identical(item$protocol, "C0")) {
+          return(NULL)
+        }
+
+        choices <- .zeus_app_available_wavelengths(item$data)
+        if (length(choices) == 0L) {
+          choices <- "450"
+        }
+        selected_choice <- if ("450" %in% choices) "450" else choices[[1]]
+
+        shiny::selectInput(
+          "mean_wavelength",
+          "C0 waveform block",
+          choices = choices,
+          selected = .zeus_app_if_null(input$mean_wavelength, selected_choice)
+        )
+      })
+
+      output$mean_plot <- shiny::renderPlot({
+        item <- selected_item()
+        if (is.null(item)) {
           return(.zeus_app_placeholder_plot("Import an ABF file to view the mean waveform."))
         }
 
-        wavelength_select <- if (identical(x$protocol, "C0")) input$mean_wavelength else NULL
+        slots <- .zeus_app_available_slots(item$data)
+        selected_slot <- if (!is.null(input$mean_data_slot) && input$mean_data_slot %in% slots) {
+          input$mean_data_slot
+        } else {
+          slots[[1]]
+        }
+        wavelength_select <- if (identical(item$protocol, "C0")) input$mean_wavelength else NULL
         compare_raw <- isTRUE(input$compare_raw) &&
-          .zeus_app_can_compare_raw(x, input$mean_data_slot)
+          .zeus_app_can_compare_raw(item$data, selected_slot)
 
         zeus_plot_mean_waveform(
-          x = x,
-          data_slot = input$mean_data_slot,
+          x = item$data,
+          data_slot = selected_slot,
           compare_raw = compare_raw,
           include_overall = isTRUE(input$include_overall),
           overlay_markers = isTRUE(input$overlay_markers),
           include_photocell = isTRUE(input$include_photocell),
           wavelength_select = wavelength_select
         )
-      })
+      }, res = 144)
 
-      spectral_plot_obj <- shiny::reactive({
-        x <- imported_data()
-        if (is.null(x)) {
+      output$spectral_plot <- shiny::renderPlot({
+        item <- selected_item()
+        if (is.null(item)) {
           return(.zeus_app_placeholder_plot("Import an ABF file to view the spectral waveform panel."))
         }
 
         zeus_plot_spectral_waveform(
-          x = x,
+          x = item$data,
           include_photocell = isTRUE(input$include_photocell)
         )
-      })
+      }, res = 144)
 
-      intensity_plot_obj <- shiny::reactive({
-        x <- imported_data()
-        if (is.null(x)) {
+      output$intensity_plot <- shiny::renderPlot({
+        item <- selected_item()
+        if (is.null(item)) {
           return(.zeus_app_placeholder_plot("Import an ABF file to view the intensity-response plot."))
         }
 
         zeus_plot_intensity_response(
-          x = x,
+          x = item$data,
           use_se = isTRUE(input$use_se)
         )
-      })
-
-      output$mean_plot <- shiny::renderPlot({
-        mean_plot_obj()
-      }, res = 144)
-
-      output$spectral_plot <- shiny::renderPlot({
-        spectral_plot_obj()
-      }, res = 144)
-
-      output$intensity_plot <- shiny::renderPlot({
-        intensity_plot_obj()
       }, res = 144)
 
       output$average_peaks_table <- DT::renderDT({
-        .zeus_app_table(.zeus_app_peak_summary_table(peak_statistics()))
+        .zeus_app_table(.zeus_app_peak_summary_table(current_stats()))
       })
 
       output$key_statistics_table <- DT::renderDT({
-        .zeus_app_table(peak_statistics()$key_statistics)
+        .zeus_app_table(current_stats()$key_statistics)
       })
 
       output$by_nd_table <- DT::renderDT({
-        .zeus_app_table(peak_statistics()$by_nd)
+        .zeus_app_table(current_stats()$by_nd)
       })
 
       output$by_wavelength_table <- DT::renderDT({
-        .zeus_app_table(peak_statistics()$by_wavelength)
+        .zeus_app_table(current_stats()$by_wavelength)
       })
 
       output$combined_statistics_table <- DT::renderDT({
-        .zeus_app_table(peak_statistics()$combined_export)
+        .zeus_app_table(current_stats()$combined_export)
       })
 
-      output$download_bundle <- shiny::downloadHandler(
+      output$download_csv_bundle <- shiny::downloadHandler(
         filename = function() {
           file_stem <- trimws(input$export_name)
           if (!nzchar(file_stem)) {
@@ -752,38 +1082,84 @@ zeus_app <- function() {
           paste0(file_stem, "_bundle.zip")
         },
         content = function(file) {
-        x <- imported_data()
-        shiny::req(x)
+          bundle <- imported_data()
+          shiny::req(bundle)
           file_stem <- trimws(input$export_name)
           if (!nzchar(file_stem)) {
             file_stem <- "zeus_export"
           }
 
-          bundle_dir <- file.path(tempdir(), paste0(file_stem, "_bundle"))
-          unlink(bundle_dir, recursive = TRUE, force = TRUE)
+          shiny::withProgress(message = "Preparing CSV export", value = 0, {
+            bundle_dir <- file.path(tempdir(), paste0(file_stem, "_bundle"))
+            unlink(bundle_dir, recursive = TRUE, force = TRUE)
+            shiny::incProgress(0.1, detail = "Creating plot and CSV files")
 
-          shiny::withProgress(message = "Preparing export zip", value = 0.15, {
-            .zeus_app_write_export_bundle(
-              bundle_dir = bundle_dir,
-              file_stem = file_stem,
-              export_format = input$export_format,
-              mean_plot = mean_plot_obj(),
-              spectral_plot = spectral_plot_obj(),
-              intensity_plot = intensity_plot_obj(),
-              x = x
-            )
-            shiny::incProgress(0.7)
+            for (item in bundle$items) {
+              slots <- .zeus_app_available_slots(item$data)
+              selected_slot <- if (!is.null(input$mean_data_slot) && input$mean_data_slot %in% slots) {
+                input$mean_data_slot
+              } else {
+                slots[[1]]
+              }
+              wavelength_select <- if (identical(item$protocol, "C0")) {
+                input[[paste0("mean_wavelength_", item$id)]]
+              } else {
+                NULL
+              }
+              compare_raw <- isTRUE(input$compare_raw) &&
+                .zeus_app_can_compare_raw(item$data, selected_slot)
 
-            zip_files <- list.files(bundle_dir)
+              item_dir <- if (length(bundle$items) > 1L) {
+                file.path(bundle_dir, .zeus_app_sanitize_stem(item$label))
+              } else {
+                bundle_dir
+              }
+
+              .zeus_app_write_export_bundle(
+                bundle_dir = item_dir,
+                file_stem = .zeus_app_sanitize_stem(tools::file_path_sans_ext(item$file_name)),
+                mean_plot = zeus_plot_mean_waveform(
+                  x = item$data,
+                  data_slot = selected_slot,
+                  compare_raw = compare_raw,
+                  include_overall = isTRUE(input$include_overall),
+                  overlay_markers = isTRUE(input$overlay_markers),
+                  include_photocell = isTRUE(input$include_photocell),
+                  wavelength_select = wavelength_select
+                ),
+                spectral_plot = zeus_plot_spectral_waveform(
+                  x = item$data,
+                  include_photocell = isTRUE(input$include_photocell)
+                ),
+                intensity_plot = zeus_plot_intensity_response(
+                  x = item$data,
+                  use_se = isTRUE(input$use_se)
+                ),
+                x = item$data
+              )
+            }
+
+            shiny::incProgress(0.65, detail = "Compressing CSV bundle")
+            zip_files <- list.files(bundle_dir, recursive = TRUE)
+            tmp_zip <- tempfile(pattern = paste0(file_stem, "_"), fileext = ".zip")
             .zeus_zip_files(
-              zipfile = file,
+              zipfile = tmp_zip,
               files = zip_files,
               root_dir = bundle_dir
             )
-            shiny::incProgress(0.15)
+
+            shiny::incProgress(0.2, detail = "Finalizing download")
+            ok <- file.copy(tmp_zip, file, overwrite = TRUE)
+            if (!isTRUE(ok) || !file.exists(file)) {
+              stop("Failed to prepare ZIP download.", call. = FALSE)
+            }
+            shiny::incProgress(0.05)
           })
-        }
+        },
+        contentType = "application/zip"
       )
+
+      shiny::outputOptions(output, "download_csv_bundle", suspendWhenHidden = FALSE)
     }
   )
 }
