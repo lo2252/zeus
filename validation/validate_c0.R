@@ -9,7 +9,7 @@
 #
 # REQUIRED FILES:
 #   inst/extdata/26225005.abf
-#   /Volumes/LOGANUSB/origin_files/26225005_origin_export_with_d_wave.xlsx
+#   /26225005_origin_export_with_d_wave.xlsx
 #   Or temp_file/26225005_origin_export_with_d_wave.xlsx
 
 
