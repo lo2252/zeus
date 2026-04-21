@@ -1,9 +1,15 @@
 Package: ZEUS
-Title: What the Package Does (One Line, Title Case)
+Title: Analyze ZEUS Electrophysiology Stimulus-Response Recordings
 Version: 0.0.0.9000
 Authors@R: 
-    person("First", "Last", , "first.last@example.com", role = c("aut", "cre"))
-Description: What the package does (one paragraph).
+    person("Logan", "Ouellette", email = "lo2252@users.noreply.github.com",
+           role = c("aut", "cre"))
+Author: Logan Ouellette [aut, cre]
+Maintainer: Logan Ouellette <lo2252@users.noreply.github.com>
+Description: Imports ABF electrophysiology recordings, applies ZEUS C0 and C1
+    stimulus-response protocol metadata, computes averaged ERG traces and
+    peak statistics, and exports validation-ready summaries for downstream
+    analysis.
 License: MIT + file LICENSE
 Encoding: UTF-8
 Depends:

@@ -51,6 +51,110 @@ zeus_summarize_protocol_validation <- function(compare_df,
   do.call(rbind, out)
 }
 
+#' Validate protocol-level agreement
+#'
+#' @description
+#' Checks that all non-missing protocol comparison values pass. This is a small
+#' assertion helper for validation scripts and package tests that need a clear
+#' pass/fail result instead of only printed diagnostics.
+#'
+#' @param compare_df Data frame containing logical match columns.
+#' @param match_cols Character vector of logical columns to validate.
+#' @param error Logical; if `TRUE`, fail with an error when any comparison does
+#'   not pass.
+#'
+#' @return The summary data frame produced by
+#'   `zeus_summarize_protocol_validation()`, with an added logical `passed`
+#'   column.
+#' @export
+zeus_validate_protocol_agreement <- function(compare_df,
+                                             match_cols = c(
+                                               "label_match",
+                                               "wavelength_match",
+                                               "nd_match",
+                                               "match"
+                                             ),
+                                             error = TRUE) {
+  out <- zeus_summarize_protocol_validation(
+    compare_df = compare_df,
+    match_cols = match_cols
+  )
+
+  out$passed <- out$n_total > 0L & out$n_match == out$n_total
+
+  if (isTRUE(error) && any(!out$passed)) {
+    failed <- out$comparison[!out$passed]
+    stop(
+      "Protocol validation failed for: ",
+      paste(failed, collapse = ", "),
+      call. = FALSE
+    )
+  }
+
+  out
+}
+
+.zeus_require_columns <- function(df, cols, arg_name) {
+  missing_cols <- setdiff(cols, names(df))
+
+  if (length(missing_cols) > 0L) {
+    stop(
+      "`", arg_name, "` is missing required columns: ",
+      paste(missing_cols, collapse = ", "),
+      call. = FALSE
+    )
+  }
+}
+
+.zeus_assert_numeric_column <- function(df, col, arg_name) {
+  if (!is.numeric(df[[col]])) {
+    stop(
+      "`", arg_name, "$", col, "` must be numeric.",
+      call. = FALSE
+    )
+  }
+}
+
+.zeus_has_duplicate_keys <- function(df, by) {
+  any(duplicated(df[by]))
+}
+
+.zeus_duplicate_key_message <- function(df, by) {
+  dup <- df[duplicated(df[by]) | duplicated(df[by], fromLast = TRUE), by, drop = FALSE]
+  dup <- utils::head(unique(dup), 5L)
+
+  rows <- apply(dup, 1L, function(x) {
+    paste(paste(by, x, sep = "="), collapse = ", ")
+  })
+
+  paste(rows, collapse = "; ")
+}
+
+.zeus_cor_complete <- function(x, y) {
+  ok <- stats::complete.cases(x, y)
+
+  if (sum(ok) < 2L) {
+    return(NA_real_)
+  }
+
+  suppressWarnings(stats::cor(x[ok], y[ok]))
+}
+
+.zeus_agreement_summary <- function(dat) {
+  finite_pairs <- is.finite(dat$zeus_value) & is.finite(dat$reference_value)
+
+  data.frame(
+    n_points = nrow(dat),
+    n_complete = sum(finite_pairs),
+    mean_diff = mean(dat$diff, na.rm = TRUE),
+    mean_abs_diff = mean(dat$abs_diff, na.rm = TRUE),
+    rmse = sqrt(mean(dat$sq_diff, na.rm = TRUE)),
+    max_abs_diff = if (all(is.na(dat$abs_diff))) NA_real_ else max(dat$abs_diff, na.rm = TRUE),
+    cor_value = .zeus_cor_complete(dat$zeus_value, dat$reference_value),
+    stringsAsFactors = FALSE
+  )
+}
+
 #' Compare ZEUS and reference waveforms point-by-point
 #'
 #' @description
@@ -73,6 +177,7 @@ zeus_summarize_protocol_validation <- function(compare_df,
 #'   \item{point_compare}{Joined point-level comparison table.}
 #'   \item{overall_summary}{One-row data frame of overall agreement metrics.}
 #'   \item{group_summary}{Group-level agreement metrics.}
+#'   \item{coverage_summary}{One-row data frame describing join coverage.}
 #' }
 #' @export
 zeus_compare_waveforms <- function(zeus_df,
@@ -85,30 +190,38 @@ zeus_compare_waveforms <- function(zeus_df,
     stop("`zeus_df` and `reference_df` must both be data frames.", call. = FALSE)
   }
 
+  if (!is.character(by) || length(by) == 0L || any(!nzchar(by))) {
+    stop("`by` must be a non-empty character vector.", call. = FALSE)
+  }
+
   required_zeus <- unique(c(by, zeus_value_col))
   required_ref <- unique(c(by, reference_value_col))
 
-  missing_zeus <- setdiff(required_zeus, names(zeus_df))
-  missing_ref <- setdiff(required_ref, names(reference_df))
+  .zeus_require_columns(zeus_df, required_zeus, "zeus_df")
+  .zeus_require_columns(reference_df, required_ref, "reference_df")
+  .zeus_assert_numeric_column(zeus_df, zeus_value_col, "zeus_df")
+  .zeus_assert_numeric_column(reference_df, reference_value_col, "reference_df")
 
-  if (length(missing_zeus) > 0L) {
-    stop(
-      "`zeus_df` is missing required columns: ",
-      paste(missing_zeus, collapse = ", "),
-      call. = FALSE
-    )
-  }
-
-  if (length(missing_ref) > 0L) {
-    stop(
-      "`reference_df` is missing required columns: ",
-      paste(missing_ref, collapse = ", "),
-      call. = FALSE
-    )
-  }
-
-  if (!group_col %in% names(zeus_df) && !group_col %in% names(reference_df)) {
+  if (!is.null(group_col) &&
+      !group_col %in% names(zeus_df) &&
+      !group_col %in% names(reference_df)) {
     stop("`group_col` was not found in either input data frame.", call. = FALSE)
+  }
+
+  if (.zeus_has_duplicate_keys(zeus_df, by)) {
+    stop(
+      "`zeus_df` contains duplicate join keys. Examples: ",
+      .zeus_duplicate_key_message(zeus_df, by),
+      call. = FALSE
+    )
+  }
+
+  if (.zeus_has_duplicate_keys(reference_df, by)) {
+    stop(
+      "`reference_df` contains duplicate join keys. Examples: ",
+      .zeus_duplicate_key_message(reference_df, by),
+      call. = FALSE
+    )
   }
 
   zeus_work <- zeus_df
@@ -129,29 +242,22 @@ zeus_compare_waveforms <- function(zeus_df,
     stop("No matched rows were found after joining the waveform tables.", call. = FALSE)
   }
 
+  coverage_summary <- data.frame(
+    n_zeus_rows = nrow(zeus_work),
+    n_reference_rows = nrow(ref_work),
+    n_matched_rows = nrow(point_compare),
+    pct_zeus_matched = 100 * nrow(point_compare) / nrow(zeus_work),
+    pct_reference_matched = 100 * nrow(point_compare) / nrow(ref_work),
+    stringsAsFactors = FALSE
+  )
+
   point_compare$diff <- point_compare$zeus_value - point_compare$reference_value
   point_compare$abs_diff <- abs(point_compare$diff)
   point_compare$sq_diff <- point_compare$diff^2
 
-  summarize_one <- function(dat) {
-    data.frame(
-      n_points = nrow(dat),
-      mean_diff = mean(dat$diff, na.rm = TRUE),
-      mean_abs_diff = mean(dat$abs_diff, na.rm = TRUE),
-      rmse = sqrt(mean(dat$sq_diff, na.rm = TRUE)),
-      max_abs_diff = max(dat$abs_diff, na.rm = TRUE),
-      cor_value = stats::cor(
-        dat$zeus_value,
-        dat$reference_value,
-        use = "complete.obs"
-      ),
-      stringsAsFactors = FALSE
-    )
-  }
+  overall_summary <- .zeus_agreement_summary(point_compare)
 
-  overall_summary <- summarize_one(point_compare)
-
-  if (!group_col %in% names(point_compare)) {
+  if (is.null(group_col) || !group_col %in% names(point_compare)) {
     group_summary <- overall_summary
   } else {
     split_groups <- split(point_compare, point_compare[[group_col]])
@@ -159,7 +265,7 @@ zeus_compare_waveforms <- function(zeus_df,
     group_summary <- do.call(
       rbind,
       lapply(names(split_groups), function(g) {
-        out <- summarize_one(split_groups[[g]])
+        out <- .zeus_agreement_summary(split_groups[[g]])
         out[[group_col]] <- g
         out
       })
@@ -168,6 +274,7 @@ zeus_compare_waveforms <- function(zeus_df,
     group_summary <- group_summary[, c(
       group_col,
       "n_points",
+      "n_complete",
       "mean_diff",
       "mean_abs_diff",
       "rmse",
@@ -180,6 +287,155 @@ zeus_compare_waveforms <- function(zeus_df,
   list(
     point_compare = point_compare,
     overall_summary = overall_summary,
-    group_summary = group_summary
+    group_summary = group_summary,
+    coverage_summary = coverage_summary
   )
+}
+
+#' Validate response agreement metrics
+#'
+#' @description
+#' Applies package-level response validation thresholds to one or more agreement
+#' summary rows, such as the `overall_summary` or `group_summary` returned by
+#' `zeus_compare_waveforms()`.
+#'
+#' @param summary_df Data frame with agreement columns `n_points`,
+#'   `n_complete`, `mean_abs_diff`, `rmse`, `max_abs_diff`, and `cor_value`.
+#' @param min_n_complete Optional minimum complete point count.
+#' @param min_correlation Optional minimum Pearson correlation.
+#' @param max_mean_abs_diff Optional maximum mean absolute difference.
+#' @param max_rmse Optional maximum root-mean-square error.
+#' @param max_abs_diff Optional maximum absolute point difference.
+#' @param label Human-readable label used in error messages.
+#' @param error Logical; if `TRUE`, fail with an error when any check does not
+#'   pass.
+#'
+#' @return A data frame containing one row per threshold check and a logical
+#'   `passed` column.
+#' @export
+zeus_validate_response_agreement <- function(summary_df,
+                                             min_n_complete = NULL,
+                                             min_correlation = NULL,
+                                             max_mean_abs_diff = NULL,
+                                             max_rmse = NULL,
+                                             max_abs_diff = NULL,
+                                             label = "response",
+                                             error = TRUE) {
+  if (!is.data.frame(summary_df)) {
+    stop("`summary_df` must be a data frame.", call. = FALSE)
+  }
+
+  required <- c(
+    "n_points",
+    "mean_abs_diff",
+    "rmse",
+    "max_abs_diff",
+    "cor_value"
+  )
+  .zeus_require_columns(summary_df, required, "summary_df")
+
+  if (!"n_complete" %in% names(summary_df)) {
+    summary_df$n_complete <- summary_df$n_points
+  }
+
+  checks <- list()
+
+  finite_min <- function(x) {
+    if (all(is.na(x))) {
+      return(NA_real_)
+    }
+
+    min(x, na.rm = TRUE)
+  }
+
+  finite_max <- function(x) {
+    if (all(is.na(x))) {
+      return(NA_real_)
+    }
+
+    max(x, na.rm = TRUE)
+  }
+
+  all_at_least <- function(x, threshold) {
+    all(!is.na(x)) && all(x >= threshold)
+  }
+
+  all_at_most <- function(x, threshold) {
+    all(!is.na(x)) && all(x <= threshold)
+  }
+
+  add_check <- function(metric, observed, threshold, passed) {
+    checks[[length(checks) + 1L]] <<- data.frame(
+      label = label,
+      metric = metric,
+      observed = observed,
+      threshold = threshold,
+      passed = passed,
+      stringsAsFactors = FALSE
+    )
+  }
+
+  if (!is.null(min_n_complete)) {
+    add_check(
+      "n_complete",
+      finite_min(summary_df$n_complete),
+      min_n_complete,
+      all_at_least(summary_df$n_complete, min_n_complete)
+    )
+  }
+
+  if (!is.null(min_correlation)) {
+    add_check(
+      "cor_value",
+      finite_min(summary_df$cor_value),
+      min_correlation,
+      all_at_least(summary_df$cor_value, min_correlation)
+    )
+  }
+
+  if (!is.null(max_mean_abs_diff)) {
+    add_check(
+      "mean_abs_diff",
+      finite_max(summary_df$mean_abs_diff),
+      max_mean_abs_diff,
+      all_at_most(summary_df$mean_abs_diff, max_mean_abs_diff)
+    )
+  }
+
+  if (!is.null(max_rmse)) {
+    add_check(
+      "rmse",
+      finite_max(summary_df$rmse),
+      max_rmse,
+      all_at_most(summary_df$rmse, max_rmse)
+    )
+  }
+
+  if (!is.null(max_abs_diff)) {
+    add_check(
+      "max_abs_diff",
+      finite_max(summary_df$max_abs_diff),
+      max_abs_diff,
+      all_at_most(summary_df$max_abs_diff, max_abs_diff)
+    )
+  }
+
+  if (length(checks) == 0L) {
+    stop("At least one validation threshold must be supplied.", call. = FALSE)
+  }
+
+  out <- do.call(rbind, checks)
+
+  if (isTRUE(error) && any(!out$passed)) {
+    failed <- out$metric[!out$passed]
+    stop(
+      "Response validation failed for `",
+      label,
+      "`: ",
+      paste(failed, collapse = ", "),
+      call. = FALSE
+    )
+  }
+
+  out
 }

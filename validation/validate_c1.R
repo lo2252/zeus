@@ -15,7 +15,7 @@
 
 # Load the ZEUS package
 if (!requireNamespace("pkgload", quietly = TRUE)) {
-  install.packages("pkgload")
+  stop("Package `pkgload` is required to run validation scripts.", call. = FALSE)
 }
 pkgload::load_all(quiet = TRUE)
 
@@ -29,7 +29,10 @@ suppressPackageStartupMessages({
 
 # File paths
 abf_path    <- file.path("inst", "extdata", "26225004.abf")
-xlsx_path   <- file.path("temp_file", "26225004_origin_export_with_d_wave.xlsx")
+xlsx_path   <- Sys.getenv(
+  "ZEUS_VALIDATION_C1_XLSX",
+  unset = file.path("temp_file", "26225004_origin_export_with_d_wave.xlsx")
+)
 xlsx_fallback <- file.path("/Volumes", "LOGANUSB", "origin_files", "26225004_origin_export_with_d_wave.xlsx")
 sheet_name  <- "StimResp"
 erg_channel <- "ERG DAM80"
@@ -92,6 +95,22 @@ summarise_agreement <- function(df, val_col, ref_col, label) {
     max(abs(diff_col), na.rm = TRUE),
     suppressWarnings(cor(df[[val_col]], df[[ref_col]], use = "complete.obs"))
   ))
+}
+
+validation_threshold <- function(name, default = NULL) {
+  value <- Sys.getenv(name, unset = "")
+
+  if (!nzchar(value)) {
+    return(default)
+  }
+
+  out <- suppressWarnings(as.numeric(value))
+
+  if (!is.finite(out)) {
+    stop("Validation threshold `", name, "` must be numeric.", call. = FALSE)
+  }
+
+  out
 }
 
 # Import ZEUS C1 data
@@ -187,6 +206,16 @@ if (nrow(mismatches) > 0L) {
   cat("  All 70 C1 protocol labels match Origin exactly.\n")
 }
 
+protocol_validation <- zeus_validate_protocol_agreement(
+  protocol_compare,
+  match_cols = "match",
+  error = FALSE
+)
+
+if (!all(protocol_validation$passed)) {
+  stop("C1 protocol label validation failed.", call. = FALSE)
+}
+
 # Sweep → stim_index mapping validation
 cat("\n-- Sweep-to-stim mapping validation (4-rep protocol) --\n")
 
@@ -220,6 +249,16 @@ if (nrow(sweep_mismatches) > 0L) {
   print(sweep_mismatches, n = Inf)
 } else {
   cat("  All 280 sweep labels match Origin exactly.\n")
+}
+
+sweep_validation <- zeus_validate_protocol_agreement(
+  sweep_compare,
+  match_cols = "match",
+  error = FALSE
+)
+
+if (!all(sweep_validation$passed)) {
+  stop("C1 sweep mapping validation failed.", call. = FALSE)
 }
 
 # Mean trace comparison: ZEUS vs Origin
@@ -298,22 +337,49 @@ if (nrow(wave_compare) == 0L) {
   cat("  Possible causes:\n")
   cat("    - time_ms mismatch: check that Origin time column is in milliseconds\n")
   cat("    - stim_label mismatch: run protocol comparison above to verify\n")
+  stop("C1 trace response validation failed: no matched rows.", call. = FALSE)
 } else {
-  summarise_agreement <- function(df, val_col, ref_col, label) {
-    diff_col <- df[[val_col]] - df[[ref_col]]
-    cat(sprintf(
-      "\n  %s vs Origin:\n    n=%d  mean_diff=%.3f  mean|diff|=%.3f  RMSE=%.3f  max|diff|=%.3f  r=%.6f\n",
-      label, nrow(df),
-      mean(diff_col, na.rm = TRUE),
-      mean(abs(diff_col), na.rm = TRUE),
-      sqrt(mean(diff_col^2, na.rm = TRUE)),
-      max(abs(diff_col), na.rm = TRUE),
-      suppressWarnings(cor(df[[val_col]], df[[ref_col]], use = "complete.obs"))
-    ))
-  }
-
   summarise_agreement(wave_compare, "zeus_raw",      "origin_value", "ZEUS unsmoothed (value_raw)")
   summarise_agreement(wave_compare, "zeus_smoothed", "origin_value", "ZEUS smoothed   (value)    ")
+
+  wave_raw_agreement <- zeus_compare_waveforms(
+    zeus_df = zeus_processed |>
+      dplyr::select("stim_label", "time_ms", zeus_value = "zeus_raw"),
+    reference_df = origin_long |>
+      dplyr::select("stim_label", "time_ms", reference_value = "origin_value")
+  )
+
+  wave_smoothed_agreement <- zeus_compare_waveforms(
+    zeus_df = zeus_processed |>
+      dplyr::select("stim_label", "time_ms", zeus_value = "zeus_smoothed"),
+    reference_df = origin_long |>
+      dplyr::select("stim_label", "time_ms", reference_value = "origin_value")
+  )
+
+  wave_raw_validation <- zeus_validate_response_agreement(
+    wave_raw_agreement$overall_summary,
+    min_n_complete = validation_threshold("ZEUS_VALIDATION_MIN_TRACE_POINTS", 1),
+    min_correlation = validation_threshold("ZEUS_VALIDATION_MIN_RAW_TRACE_COR"),
+    max_mean_abs_diff = validation_threshold("ZEUS_VALIDATION_MAX_RAW_TRACE_MEAN_ABS_DIFF_UV"),
+    max_rmse = validation_threshold("ZEUS_VALIDATION_MAX_RAW_TRACE_RMSE_UV"),
+    label = "C1 unsmoothed trace response",
+    error = FALSE
+  )
+
+  wave_smoothed_validation <- zeus_validate_response_agreement(
+    wave_smoothed_agreement$overall_summary,
+    min_n_complete = validation_threshold("ZEUS_VALIDATION_MIN_TRACE_POINTS", 1),
+    min_correlation = validation_threshold("ZEUS_VALIDATION_MIN_TRACE_COR", 0.99),
+    max_mean_abs_diff = validation_threshold("ZEUS_VALIDATION_MAX_TRACE_MEAN_ABS_DIFF_UV"),
+    max_rmse = validation_threshold("ZEUS_VALIDATION_MAX_TRACE_RMSE_UV"),
+    label = "C1 smoothed trace response",
+    error = FALSE
+  )
+
+  if (!all(wave_smoothed_validation$passed)) {
+    print(wave_smoothed_validation)
+    stop("C1 trace response validation failed.", call. = FALSE)
+  }
 
   by_label <- wave_compare |>
     dplyr::group_by(.data$stim_label) |>
@@ -423,13 +489,13 @@ cat("\n== C1 Validation Summary ==\n")
 cat(sprintf("  Protocol labels match:  %d / 70\n",  n_match))
 cat(sprintf("  Sweep labels match:     %d / 280\n", n_sweep_match))
 if (nrow(wave_compare) > 0L) {
-  diff_raw <- wave_compare$zeus_raw - wave_compare$origin_value
+  diff_smoothed <- wave_compare$zeus_smoothed - wave_compare$origin_value
   cat(sprintf(
-    "  Trace correlation (unsmoothed): %.6f\n",
-    suppressWarnings(cor(wave_compare$zeus_raw, wave_compare$origin_value,
+    "  Trace correlation (smoothed):   %.6f\n",
+    suppressWarnings(cor(wave_compare$zeus_smoothed, wave_compare$origin_value,
                          use = "complete.obs"))
   ))
-  cat(sprintf("  Mean |diff| (uV):               %.4f\n", mean(abs(diff_raw), na.rm = TRUE)))
+  cat(sprintf("  Mean |diff| (uV, smoothed):     %.4f\n", mean(abs(diff_smoothed), na.rm = TRUE)))
 }
 
 results_c1 <- list(
@@ -445,5 +511,15 @@ results_c1 <- list(
   origin_stats_summary = origin_stats_summary,
   stats_compare    = stats_compare
 )
+
+if (exists("wave_raw_agreement", inherits = FALSE)) {
+  results_c1$wave_raw_agreement <- wave_raw_agreement
+  results_c1$wave_smoothed_agreement <- wave_smoothed_agreement
+  results_c1$wave_raw_validation <- wave_raw_validation
+  results_c1$wave_smoothed_validation <- wave_smoothed_validation
+}
+
+results_c1$protocol_validation <- protocol_validation
+results_c1$sweep_validation <- sweep_validation
 
 cat("\nDone. Results stored in 'results_c1'.\n")

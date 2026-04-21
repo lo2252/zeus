@@ -91,17 +91,17 @@
       sd_latency_ms = round(.data$sd_latency_ms, 3)
     ) |>
     dplyr::rename(
-      Protocol = .data$protocol_id,
-      `Wave Type` = .data$peak_type,
-      `Sample Count` = .data$n,
-      `Mean Peak (mV)` = .data$mean_peak_mv,
-      `Peak SD (mV)` = .data$sd_peak_mv,
-      `Peak SEM (mV)` = .data$sem_peak_mv,
-      `Median Peak (mV)` = .data$median_peak_mv,
-      `Minimum Peak (mV)` = .data$min_peak_mv,
-      `Maximum Peak (mV)` = .data$max_peak_mv,
-      `Mean Latency (ms)` = .data$mean_latency_ms,
-      `Latency SD (ms)` = .data$sd_latency_ms
+      Protocol = protocol_id,
+      `Wave Type` = peak_type,
+      `Sample Count` = n,
+      `Mean Peak (mV)` = mean_peak_mv,
+      `Peak SD (mV)` = sd_peak_mv,
+      `Peak SEM (mV)` = sem_peak_mv,
+      `Median Peak (mV)` = median_peak_mv,
+      `Minimum Peak (mV)` = min_peak_mv,
+      `Maximum Peak (mV)` = max_peak_mv,
+      `Mean Latency (ms)` = mean_latency_ms,
+      `Latency SD (ms)` = sd_latency_ms
     )
 }
 
