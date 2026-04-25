@@ -1,18 +1,28 @@
+---
+output: github_document
+---
 
 <!-- README.md is generated from README.Rmd. Please edit that file -->
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.path = "man/figures/README-",
+  out.width = "100%"
+)
+```
 
 # ZEUS
 
 <!-- badges: start -->
-
-[![Lifecycle:
-experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](https://lifecycle.r-lib.org/articles/stages.html#experimental)
+[![Lifecycle: experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](https://lifecycle.r-lib.org/articles/stages.html#experimental)
 <!-- badges: end -->
 
-ZEUS is an R package for importing Axon Binary Format (`.abf`)
-electrophysiology recordings, applying ZEUS C0 and C1 stimulus-response
-protocol metadata, and producing validation-ready waveform summaries,
-plots, and exports for ERG analysis.
+ZEUS is an R package for importing Axon Binary Format (`.abf`) electrophysiology
+recordings, applying ZEUS C0 and C1 stimulus-response protocol metadata, and
+producing validation-ready waveform summaries, plots, and exports for ERG
+analysis.
 
 ## What ZEUS includes
 
@@ -20,8 +30,7 @@ plots, and exports for ERG analysis.
 - Stimulus-response labeling for ZEUS C0 and C1 protocols
 - Averaging, baseline correction, and smoothing utilities
 - Peak-summary tables and validation helpers
-- Plotting functions for mean, spectral, and intensity-response
-  waveforms
+- Plotting functions for mean, spectral, and intensity-response waveforms
 - A Shiny app for interactive review and export
 
 ## Installation
@@ -35,10 +44,9 @@ pak::pak("lo2252/zeus")
 
 ## Example
 
-The package includes example ABF files in `inst/extdata`. A typical
-workflow is:
+The package includes example ABF files in `inst/extdata`. A typical workflow is:
 
-``` r
+```{r example, eval = FALSE}
 library(ZEUS)
 
 abf_path <- system.file("extdata", "26225004.abf", package = "ZEUS")
@@ -57,6 +65,6 @@ zeus_summarize_peak_statistics(x)$key_statistics
 
 To launch the interactive Shiny workflow:
 
-``` r
+```{r shiny-app, eval = FALSE}
 run_zeus_app()
 ```

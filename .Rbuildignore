@@ -9,3 +9,6 @@
 ^LICENSE\.md$
 ^app$
 ^validation$
+^\.positai$
+^\.claude$
+^README\.Rmd$
