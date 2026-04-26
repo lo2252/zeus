@@ -61,6 +61,38 @@ remotes::install_github("lo2252/zeus")
 
 ZEUS depends on R 4.1 or later.
 
+## Package dependencies
+
+The authoritative dependency list lives in `DESCRIPTION`, but for
+convenience the main package dependencies are listed here as well.
+
+Required runtime packages:
+
+- `bslib`
+- `dplyr`
+- `DT`
+- `ggplot2`
+- `pkgload`
+- `purrr`
+- `readABF`
+- `rlang`
+- `scales`
+- `shiny`
+- `signal`
+- `stringr`
+- `tibble`
+- `tidyr`
+- `zoo`
+
+Suggested packages used for development or testing:
+
+- `rstudioapi`
+- `testthat`
+
+If you install ZEUS from GitHub with `pak::pak()` or
+`remotes::install_github()`, these package dependencies are installed
+automatically.
+
 ## Included example data
 
 The package ships with example ABF files in `inst/extdata` so you can
