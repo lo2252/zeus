@@ -1,5 +1,9 @@
 
-<!-- README.md is generated from README.Rmd. Please edit that file -->
+<!-- README.md is generated from README.Rmd. Do not edit README.md directly. Edit README.Rmd and then rebuild the README. -->
+
+<p align="center">
+  <img src="app/www/ZEUS_Logo6.png" alt="ZEUS logo" width="280">
+</p>
 
 # ZEUS
 
@@ -268,3 +272,32 @@ export workflow is already in place.
 Issues and pull requests are welcome. If you are extending the package,
 edit `README.Rmd` rather than `README.md`, then regenerate the Markdown
 README so the rendered file stays in sync.
+
+## Authorship and Contributions
+
+ZEUS is authored and maintained by Logan Ouellette.
+
+Primary contributions include:
+
+- package design and analysis workflow development
+- protocol mapping and validation logic for ZEUS `C0` and `C1` recordings
+- implementation of import, plotting, export, and Shiny application
+  features
+- authorship, review, and curation of package documentation
+
+AI-assisted support was used during development and documentation to
+help with drafting, editing, code iteration, and implementation
+acceleration. Final scientific interpretation, software decisions, and
+content review were carried out by the package author.
+
+## References
+
+- ZEUS package source repository and bundled validation materials:
+  `validation/README.md`, `inst/extdata/README.txt`
+- ZENV / Connaughton laboratory publication and project page:
+  <https://edspace.american.edu/connaughtonzenvlab/>
+- Masson, G. S. (2019). `readABF`: Import Axon Binary File Format Data.
+  CRAN package. <https://CRAN.R-project.org/package=readABF>
+- OriginLab. Origin and OriginPro. Reference software used for
+  comparison in ZEUS validation workflows.
+  <https://www.originlab.com/>
