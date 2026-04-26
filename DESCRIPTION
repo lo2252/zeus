@@ -1,15 +1,17 @@
 Package: ZEUS
-Title: Analyze ZEUS Electrophysiology Stimulus-Response Recordings
-Version: 0.0.0.9000
+Title: Zebrafish Electroretinography Utility Suite 
+Version: 0.1.1
 Authors@R: 
-    person("Logan", "Ouellette", email = "lo2252@users.noreply.github.com",
+    person("Logan", "Ouellette", email = "ouellettelogan4@gmail.com",
            role = c("aut", "cre"))
 Author: Logan Ouellette [aut, cre]
-Maintainer: Logan Ouellette <lo2252@users.noreply.github.com>
+Maintainer: Logan Ouellette <ouellettelogan4@gmail.com>
 Description: Imports ABF electrophysiology recordings, applies ZEUS C0 and C1
     stimulus-response protocol metadata, computes averaged ERG traces and
     peak statistics, and exports validation-ready summaries for downstream
     analysis.
+URL: https://github.com/lo2252/zeus
+BugReports: https://github.com/lo2252/zeus/issues
 License: MIT + file LICENSE
 Encoding: UTF-8
 Depends:

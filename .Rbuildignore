@@ -4,11 +4,14 @@
 ^.*\.DS_Store$
 ^\.git$
 ^\.gitignore$
+^\.Rhistory$
 ^\.\.Rcheck$
 ^.*\.Rcheck$
+^.*\.tar\.gz$
 ^LICENSE\.md$
 ^app$
 ^validation$
 ^\.positai$
 ^\.claude$
 ^README\.Rmd$
+^cran-comments\.md$

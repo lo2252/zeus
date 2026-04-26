@@ -1,0 +1,57 @@
+compute_noisy_trace_flags
+                        Compute noisy replicate flags within stimulus
+                        groups
+compute_photocell_onsets
+                        Compute photocell-based stimulus onset for each
+                        sweep
+expand_protocol_repeats
+                        Expand a protocol table to raw sweep order
+extract_irrad_wl_amp    Extract an Irrad-wl-Amp-style measurement table
+get_zeus_irrad_calibration
+                        Get a registered irradiance calibration table
+measure_trace_window    Measure one stimulus-response trace using
+                        windowed trough-to-peak logic
+nd_to_log_irradiance    Join log irradiance values to stimulus metadata
+protocol_table_C0       Build the ZEUS C0 spectral protocol table
+protocol_table_C1       Build the ZEUS C1 white-light protocol table
+read_abf_raw            Import a raw ABF file into a ZEUS raw object
+register_zeus_irrad_calibration
+                        Register an irradiance calibration table
+run_zeus_app            Run the ZEUS Shiny application
+smooth_stimresp_traces
+                        Smooth raw traces with a running mean
+summarize_stimresp_qc   Summarize StimResp noisy-replicate exclusion
+zero_baseline_traces    Zero baseline within each raw sweep trace
+zeus_app                Build the ZEUS analysis application
+zeus_avg_peak_by_nd     Average A-, B-, and D-wave peaks by neutral
+                        density
+zeus_avg_peak_by_wavelength
+                        Average A-, B-, and D-wave peaks by wavelength
+zeus_compare_waveforms
+                        Compare ZEUS and reference waveforms
+                        point-by-point
+zeus_export_csv_bundle
+                        Export ZEUS data sources as CSV files
+zeus_export_excel_workbook
+                        Export ZEUS data sources as an Excel workbook
+zeus_plot_intensity_response
+                        Plot ERG intensity-response curves for A-, B-,
+                        and D-wave features
+zeus_plot_mean_waveform
+                        Plot mean ERG waveforms from ZEUS StimResp
+                        output
+zeus_plot_spectral_waveform
+                        Plot ERG waveforms split into
+                        per-wavelength-block facets
+zeus_read_abf           Read an ABF file and build a ZEUS
+                        stimulus-response object
+zeus_summarize_peak_statistics
+                        Summarize key ZEUS peak statistics for export
+                        and display
+zeus_summarize_protocol_validation
+                        Summarize protocol-level agreement between ZEUS
+                        and a reference export
+zeus_validate_protocol_agreement
+                        Validate protocol-level agreement
+zeus_validate_response_agreement
+                        Validate response agreement metrics

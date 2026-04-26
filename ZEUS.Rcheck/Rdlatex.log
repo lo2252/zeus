@@ -1,0 +1,307 @@
+Hmm ... looks like a package
+Converting parsed Rd's to LaTeX ....
+Creating pdf output from LaTeX ...
+
+This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex)
+ restricted \write18 enabled.
+entering extended mode
+LaTeX2e <2025-11-01>
+L3 programming layer <2026-03-20>
+(./Rd2.tex
+(/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/base/book.cls
+Document Class: book 2025/01/22 v1.4n Standard LaTeX document class
+(/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/base/bk10.clo)) (/Library/Frameworks/R.framework/Resources/share/texmf/tex/latex/Rd.sty (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/base/ifthen.sty) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/generic/iftex/iftex.sty) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/tools/longtable.sty) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/tools/bm.sty) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/base/alltt.sty) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/tools/verbatim.sty) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/url/url.sty) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/base/textcomp.sty) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/amsmath/amsmath.sty
+For additional information on amsmath, use the `?' option.
+(/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/amsmath/amstext.sty (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/amsmath/amsgen.sty)) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/amsmath/amsbsy.sty) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/amsmath/amsopn.sty)) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/amsfonts/amsfonts.sty) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/amsfonts/amssymb.sty) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/jknapltx/mathrsfs.sty) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/base/fontenc.sty) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/psnfss/times.sty) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/inconsolata/zi4.sty `inconsolata-zi4' v1.12, 2019/05/17 Text macros for Inconsolata (msharpe) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/xkeyval/xkeyval.sty (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/generic/xkeyval/xkeyval.tex (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/generic/xkeyval/xkvutils.tex (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/generic/xkeyval/keyval.tex))))) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/graphics/color.sty (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/graphics-cfg/color.cfg) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/graphics-def/pdftex.def) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/graphics/mathcolor.ltx)) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/hyperref/hyperref.sty (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/kvsetkeys/kvsetkeys.sty) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/generic/kvdefinekeys/kvdefinekeys.sty) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/generic/pdfescape/pdfescape.sty (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/generic/ltxcmds/ltxcmds.sty) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/generic/pdftexcmds/pdftexcmds.sty (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/generic/infwarerr/infwarerr.sty))) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/hycolor/hycolor.sty) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/hyperref/nameref.sty (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/refcount/refcount.sty) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/generic/gettitlestring/gettitlestring.sty (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/kvoptions/kvoptions.sty))) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/etoolbox/etoolbox.sty) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/generic/stringenc/stringenc.sty) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/hyperref/pd1enc.def) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/generic/intcalc/intcalc.sty) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/hyperref/puenc.def) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/generic/bitset/bitset.sty (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/generic/bigintcalc/bigintcalc.sty))) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/hyperref/hpdftex.def (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/rerunfilecheck/rerunfilecheck.sty (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/generic/uniquecounter/uniquecounter.sty)))) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/base/makeidx.sty)
+Writing index file Rd2.idx
+(/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/psnfss/t1ptm.fd) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/l3backend/l3backend-pdftex.def)
+No file Rd2.aux.
+(/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/inconsolata/t1zi4.fd) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/amsfonts/umsa.fd) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/amsfonts/umsb.fd) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/jknapltx/ursfs.fd)
+No file Rd2.toc.
+(/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/psnfss/ts1ptm.fd) [1{/Users/loganouellette/Library/TinyTeX/texmf-var/fonts/map/pdftex/updmap/pdftex.map}{/Users/loganouellette/Library/TinyTeX/texmf-dist/fonts/enc/dvips/base/8r.enc}{/Users/loganouellette/Library/TinyTeX/texmf-dist/fonts/enc/dvips/inconsolata/i4-t1-0.enc}] [2]
+Overfull \hbox (5.75911pt too wide) in paragraph at lines 159--162
+[]\T1/ptm/m/n/10 The pho-to-cell is nor-mal-ized to []\T1/zi4/m/n/10 [0, 1][]\T1/ptm/m/n/10 , scaled to oc-cupy []\T1/zi4/m/n/10 photocell_relative_height * erg_range
+[3] [4]
+Overfull \hbox (5.43982pt too wide) in paragraph at lines 240--242
+[]\T1/ptm/m/n/10 Data frame with columns []\T1/zi4/m/n/10 stim_index[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 stim_label[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 sweep[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 time_ms[]\T1/ptm/m/n/10 , and []\T1/zi4/m/n/10 value[]\T1/ptm/m/n/10 . 
+
+Overfull \hbox (7.48907pt too wide) in paragraph at lines 248--250
+[]\T1/ptm/m/n/10 Numeric cut-off. Repli-cates with []\T1/zi4/m/n/10 sd_ratio >= noise_ratio_cutoff []\T1/ptm/m/n/10 are dropped. 
+[5]
+Overfull \hbox (13.24686pt too wide) in paragraph at lines 292--295
+\T1/ptm/m/n/10 base-line cor-rec-tion, op-tional noisy-replicate ex-clu-sion, repli-cate av-er-ag-ing, and op-tional post-averaging
+
+Overfull \hbox (22.22778pt too wide) in paragraph at lines 316--318
+[]\T1/ptm/m/n/10 A long replicate-level trace ta-ble con-tain-ing at least []\T1/zi4/m/n/10 sweep[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 stim_index[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 stim_label[]\T1/ptm/m/n/10 ,
+[6] [7]
+Overfull \hbox (7.48907pt too wide) in paragraph at lines 453--455
+[]\T1/ptm/m/n/10 Numeric cut-off. Repli-cates with []\T1/zi4/m/n/10 sd_ratio >= noise_ratio_cutoff []\T1/ptm/m/n/10 are dropped. 
+[8] [9] [10] [11]
+Overfull \hbox (4.97768pt too wide) in paragraph at lines 669--673
+[]\T1/ptm/m/n/10 Long ERG data with protocol-derived stim-u-lus meta-data added, in-clud-ing []\T1/zi4/m/n/10 stim_index[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 stim_label[]\T1/ptm/m/n/10 ,
+
+Overfull \hbox (4.88098pt too wide) in paragraph at lines 669--673
+[]\T1/zi4/m/n/10 protocol_id[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 protocol_variant[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 stim_type[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 block_index[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 within_block_index[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 wavelength[]\T1/ptm/m/n/10 ,
+[12] [13]
+Overfull \hbox (10.11722pt too wide) in paragraph at lines 766--768
+[]\T1/ptm/m/n/10 Numeric scalar used only for absolute-time fall-back when com-put-ing post-stimulus
+
+Overfull \hbox (58.03856pt too wide) in paragraph at lines 771--773
+[]\T1/ptm/m/n/10 Numeric length-2 vec-tor for the main trough search. If []\T1/zi4/m/n/10 NULL[]\T1/ptm/m/n/10 , de-faults to []\T1/zi4/m/n/10 response_window_ms[]\T1/ptm/m/n/10 . 
+
+Overfull \hbox (50.8086pt too wide) in paragraph at lines 774--776
+[]\T1/ptm/m/n/10 Numeric length-2 vec-tor for the main peak search. If []\T1/zi4/m/n/10 NULL[]\T1/ptm/m/n/10 , de-faults to []\T1/zi4/m/n/10 response_window_ms[]\T1/ptm/m/n/10 . 
+[14]
+Overfull \hbox (44.78883pt too wide) in paragraph at lines 786--788
+[]\T1/ptm/m/n/10 Numeric length-2 vec-tor for the d-wave peak search. If []\T1/zi4/m/n/10 NULL[]\T1/ptm/m/n/10 , de-faults to []\T1/zi4/m/n/10 dwave_window_ms[]\T1/ptm/m/n/10 . 
+[15] [16] [17] [18] [19] [20] [21] [22] [23]
+Overfull \hbox (52.25pt too wide) in paragraph at lines 1282--1285
+[]\T1/ptm/m/n/10 Supported com-po-nents are: []\T1/zi4/m/n/10 raw[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 traces_280[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 traces_70[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 photocell[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 stimresp_qc[]\T1/ptm/m/n/10 , and []\T1/zi4/m/n/10 stimresp_settings[]\T1/ptm/m/n/10 . 
+
+Overfull \hbox (30.15782pt too wide) in paragraph at lines 1286--1288
+[]\T1/ptm/m/n/10 For []\T1/zi4/m/n/10 raw[]\T1/ptm/m/n/10 , ob-jects of class []\T1/zi4/m/n/10 ABF []\T1/ptm/m/n/10 or []\T1/zi4/m/n/10 zeus_abf_raw []\T1/ptm/m/n/10 are con-verted to ZEUS long for-mat with [][][]\T1/zi4/m/n/10 abf_as_df_long()[][][]
+
+Overfull \hbox (35.91003pt too wide) in paragraph at lines 1292--1295
+[]\T1/ptm/m/n/10 Supported com-po-nents are: []\T1/zi4/m/n/10 raw[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 traces_280[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 traces_70[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 photocell[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 stimresp_qc[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 stimresp_settings[]\T1/ptm/m/n/10 ,
+
+Overfull \hbox (30.15782pt too wide) in paragraph at lines 1296--1298
+[]\T1/ptm/m/n/10 For []\T1/zi4/m/n/10 raw[]\T1/ptm/m/n/10 , ob-jects of class []\T1/zi4/m/n/10 ABF []\T1/ptm/m/n/10 or []\T1/zi4/m/n/10 zeus_abf_raw []\T1/ptm/m/n/10 are con-verted to ZEUS long for-mat with [][][]\T1/zi4/m/n/10 abf_as_df_long()[][][]
+[24]
+Overfull \hbox (35.91003pt too wide) in paragraph at lines 1330--1333
+[]\T1/ptm/m/n/10 Supported com-po-nents are: []\T1/zi4/m/n/10 raw[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 traces_280[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 traces_70[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 photocell[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 stimresp_qc[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 stimresp_settings[]\T1/ptm/m/n/10 ,
+[25] [26] [27]
+Overfull \hbox (0.11917pt too wide) in paragraph at lines 1522--1525
+\T1/ptm/m/n/10 when []\T1/zi4/m/n/10 photocell_auto_scale = TRUE[]\T1/ptm/m/n/10 . De-fault is []\T1/zi4/m/n/10 1.1 []\T1/ptm/m/n/10 (110% of the ERG range). 
+[28] [29] [30] [31]
+Overfull \hbox (0.10808pt too wide) in paragraph at lines 1784--1786
+[]\T1/ptm/m/n/10 Integer running-average win-dow size for av-er-aged stimulus-response traces. Use
+[32]
+Overfull \hbox (34.79831pt too wide) in paragraph at lines 1811--1814
+[]\T1/ptm/m/n/10 Builds a report-ready sum-mary of A-, B-, and D-wave peak mea-sure-ments us-ing [][][]\T1/zi4/m/n/10 extract_irrad_wl_amp()[][][][]\T1/ptm/m/n/10 .
+[33]
+Overfull \hbox (18.67738pt too wide) in paragraph at lines 1882--1884
+[]\T1/ptm/m/n/10 Computes match counts and per-cent-ages for log-i-cal protocol-comparison columns such as []\T1/zi4/m/n/10 label_match[]\T1/ptm/m/n/10 ,
+[34] [35]
+No file Rd2.ind.
+[36] (/private/var/folders/t0/ftzbgx6j5xb2smm3sb89p73c0000gn/T/RtmpZvyJfe/Rd2pdfd9e8202391a5/Rd2.aux)
+
+Package rerunfilecheck Warning: File `Rd2.out' has changed.
+(rerunfilecheck)                Rerun to get outlines right
+(rerunfilecheck)                or use package `bookmark'.
+
+ )
+(see the transcript file for additional information)
+pdfTeX warning (dest): name{Rfn.shiny::runApp\(\)} has been referenced but does not exist, replaced by a fixed one
+
+
+pdfTeX warning (dest): name{Rfn.readABF::readABF\(\)} has been referenced but does not exist, replaced by a fixed one
+
+
+pdfTeX warning (dest): name{Rfn.grepl} has been referenced but does not exist, replaced by a fixed one
+
+</Users/loganouellette/Library/TinyTeX/texmf-dist/fonts/type1/public/inconsolata/Inconsolata-zi4r.pfb></Users/loganouellette/Library/TinyTeX/texmf-dist/fonts/type1/urw/times/utmb8a.pfb></Users/loganouellette/Library/TinyTeX/texmf-dist/fonts/type1/urw/times/utmr8a.pfb></Users/loganouellette/Library/TinyTeX/texmf-dist/fonts/type1/urw/times/utmr8a.pfb></Users/loganouellette/Library/TinyTeX/texmf-dist/fonts/type1/urw/times/utmri8a.pfb>
+Output written on Rd2.pdf (36 pages, 140048 bytes).
+Transcript written on Rd2.log.
+This is makeindex, version 2.18 [TeX Live 2026] (kpathsea + Thai support).
+Scanning input file Rd2.idx....done (86 entries accepted, 0 rejected).
+Sorting entries....done (550 comparisons).
+Generating output file Rd2.ind....done (129 lines written, 0 warnings).
+Output written in Rd2.ind.
+Transcript written in Rd2.ilg.
+This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex)
+ restricted \write18 enabled.
+entering extended mode
+LaTeX2e <2025-11-01>
+L3 programming layer <2026-03-20>
+(./Rd2.tex
+(/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/base/book.cls
+Document Class: book 2025/01/22 v1.4n Standard LaTeX document class
+(/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/base/bk10.clo)) (/Library/Frameworks/R.framework/Resources/share/texmf/tex/latex/Rd.sty (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/base/ifthen.sty) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/generic/iftex/iftex.sty) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/tools/longtable.sty) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/tools/bm.sty) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/base/alltt.sty) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/tools/verbatim.sty) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/url/url.sty) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/base/textcomp.sty) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/amsmath/amsmath.sty
+For additional information on amsmath, use the `?' option.
+(/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/amsmath/amstext.sty (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/amsmath/amsgen.sty)) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/amsmath/amsbsy.sty) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/amsmath/amsopn.sty)) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/amsfonts/amsfonts.sty) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/amsfonts/amssymb.sty) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/jknapltx/mathrsfs.sty) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/base/fontenc.sty) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/psnfss/times.sty) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/inconsolata/zi4.sty `inconsolata-zi4' v1.12, 2019/05/17 Text macros for Inconsolata (msharpe) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/xkeyval/xkeyval.sty (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/generic/xkeyval/xkeyval.tex (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/generic/xkeyval/xkvutils.tex (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/generic/xkeyval/keyval.tex))))) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/graphics/color.sty (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/graphics-cfg/color.cfg) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/graphics-def/pdftex.def) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/graphics/mathcolor.ltx)) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/hyperref/hyperref.sty (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/kvsetkeys/kvsetkeys.sty) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/generic/kvdefinekeys/kvdefinekeys.sty) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/generic/pdfescape/pdfescape.sty (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/generic/ltxcmds/ltxcmds.sty) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/generic/pdftexcmds/pdftexcmds.sty (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/generic/infwarerr/infwarerr.sty))) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/hycolor/hycolor.sty) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/hyperref/nameref.sty (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/refcount/refcount.sty) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/generic/gettitlestring/gettitlestring.sty (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/kvoptions/kvoptions.sty))) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/etoolbox/etoolbox.sty) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/generic/stringenc/stringenc.sty) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/hyperref/pd1enc.def) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/generic/intcalc/intcalc.sty) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/hyperref/puenc.def) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/generic/bitset/bitset.sty (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/generic/bigintcalc/bigintcalc.sty))) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/hyperref/hpdftex.def (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/rerunfilecheck/rerunfilecheck.sty (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/generic/uniquecounter/uniquecounter.sty)))) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/base/makeidx.sty)
+Writing index file Rd2.idx
+(/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/psnfss/t1ptm.fd) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/l3backend/l3backend-pdftex.def) (/private/var/folders/t0/ftzbgx6j5xb2smm3sb89p73c0000gn/T/RtmpZvyJfe/Rd2pdfd9e8202391a5/Rd2.aux) (/private/var/folders/t0/ftzbgx6j5xb2smm3sb89p73c0000gn/T/RtmpZvyJfe/Rd2pdfd9e8202391a5/Rd2.out) (/private/var/folders/t0/ftzbgx6j5xb2smm3sb89p73c0000gn/T/RtmpZvyJfe/Rd2pdfd9e8202391a5/Rd2.out) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/inconsolata/t1zi4.fd) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/amsfonts/umsa.fd) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/amsfonts/umsb.fd) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/jknapltx/ursfs.fd) (/private/var/folders/t0/ftzbgx6j5xb2smm3sb89p73c0000gn/T/RtmpZvyJfe/Rd2pdfd9e8202391a5/Rd2.toc [1{/Users/loganouellette/Library/TinyTeX/texmf-var/fonts/map/pdftex/updmap/pdftex.map}{/Users/loganouellette/Library/TinyTeX/texmf-dist/fonts/enc/dvips/base/8r.enc}{/Users/loganouellette/Library/TinyTeX/texmf-dist/fonts/enc/dvips/inconsolata/i4-t1-0.enc}]) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/psnfss/ts1ptm.fd) [2] [3]
+Overfull \hbox (5.75911pt too wide) in paragraph at lines 159--162
+[]\T1/ptm/m/n/10 The pho-to-cell is nor-mal-ized to []\T1/zi4/m/n/10 [0, 1][]\T1/ptm/m/n/10 , scaled to oc-cupy []\T1/zi4/m/n/10 photocell_relative_height * erg_range
+[4] [5]
+Overfull \hbox (5.43982pt too wide) in paragraph at lines 240--242
+[]\T1/ptm/m/n/10 Data frame with columns []\T1/zi4/m/n/10 stim_index[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 stim_label[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 sweep[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 time_ms[]\T1/ptm/m/n/10 , and []\T1/zi4/m/n/10 value[]\T1/ptm/m/n/10 . 
+
+Overfull \hbox (7.48907pt too wide) in paragraph at lines 248--250
+[]\T1/ptm/m/n/10 Numeric cut-off. Repli-cates with []\T1/zi4/m/n/10 sd_ratio >= noise_ratio_cutoff []\T1/ptm/m/n/10 are dropped. 
+[6]
+Overfull \hbox (13.24686pt too wide) in paragraph at lines 292--295
+\T1/ptm/m/n/10 base-line cor-rec-tion, op-tional noisy-replicate ex-clu-sion, repli-cate av-er-ag-ing, and op-tional post-averaging
+
+Overfull \hbox (22.22778pt too wide) in paragraph at lines 316--318
+[]\T1/ptm/m/n/10 A long replicate-level trace ta-ble con-tain-ing at least []\T1/zi4/m/n/10 sweep[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 stim_index[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 stim_label[]\T1/ptm/m/n/10 ,
+[7] [8]
+Overfull \hbox (7.48907pt too wide) in paragraph at lines 453--455
+[]\T1/ptm/m/n/10 Numeric cut-off. Repli-cates with []\T1/zi4/m/n/10 sd_ratio >= noise_ratio_cutoff []\T1/ptm/m/n/10 are dropped. 
+[9] [10] [11] [12]
+Overfull \hbox (4.97768pt too wide) in paragraph at lines 669--673
+[]\T1/ptm/m/n/10 Long ERG data with protocol-derived stim-u-lus meta-data added, in-clud-ing []\T1/zi4/m/n/10 stim_index[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 stim_label[]\T1/ptm/m/n/10 ,
+
+Overfull \hbox (4.88098pt too wide) in paragraph at lines 669--673
+[]\T1/zi4/m/n/10 protocol_id[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 protocol_variant[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 stim_type[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 block_index[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 within_block_index[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 wavelength[]\T1/ptm/m/n/10 ,
+[13] [14]
+Overfull \hbox (10.11722pt too wide) in paragraph at lines 766--768
+[]\T1/ptm/m/n/10 Numeric scalar used only for absolute-time fall-back when com-put-ing post-stimulus
+
+Overfull \hbox (58.03856pt too wide) in paragraph at lines 771--773
+[]\T1/ptm/m/n/10 Numeric length-2 vec-tor for the main trough search. If []\T1/zi4/m/n/10 NULL[]\T1/ptm/m/n/10 , de-faults to []\T1/zi4/m/n/10 response_window_ms[]\T1/ptm/m/n/10 . 
+
+Overfull \hbox (50.8086pt too wide) in paragraph at lines 774--776
+[]\T1/ptm/m/n/10 Numeric length-2 vec-tor for the main peak search. If []\T1/zi4/m/n/10 NULL[]\T1/ptm/m/n/10 , de-faults to []\T1/zi4/m/n/10 response_window_ms[]\T1/ptm/m/n/10 . 
+[15]
+Overfull \hbox (44.78883pt too wide) in paragraph at lines 786--788
+[]\T1/ptm/m/n/10 Numeric length-2 vec-tor for the d-wave peak search. If []\T1/zi4/m/n/10 NULL[]\T1/ptm/m/n/10 , de-faults to []\T1/zi4/m/n/10 dwave_window_ms[]\T1/ptm/m/n/10 . 
+[16] [17] [18] [19] [20] [21] [22] [23] [24]
+Overfull \hbox (52.25pt too wide) in paragraph at lines 1282--1285
+[]\T1/ptm/m/n/10 Supported com-po-nents are: []\T1/zi4/m/n/10 raw[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 traces_280[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 traces_70[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 photocell[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 stimresp_qc[]\T1/ptm/m/n/10 , and []\T1/zi4/m/n/10 stimresp_settings[]\T1/ptm/m/n/10 . 
+
+Overfull \hbox (30.15782pt too wide) in paragraph at lines 1286--1288
+[]\T1/ptm/m/n/10 For []\T1/zi4/m/n/10 raw[]\T1/ptm/m/n/10 , ob-jects of class []\T1/zi4/m/n/10 ABF []\T1/ptm/m/n/10 or []\T1/zi4/m/n/10 zeus_abf_raw []\T1/ptm/m/n/10 are con-verted to ZEUS long for-mat with [][][]\T1/zi4/m/n/10 abf_as_df_long()[][][]
+
+Overfull \hbox (35.91003pt too wide) in paragraph at lines 1292--1295
+[]\T1/ptm/m/n/10 Supported com-po-nents are: []\T1/zi4/m/n/10 raw[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 traces_280[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 traces_70[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 photocell[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 stimresp_qc[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 stimresp_settings[]\T1/ptm/m/n/10 ,
+
+Overfull \hbox (30.15782pt too wide) in paragraph at lines 1296--1298
+[]\T1/ptm/m/n/10 For []\T1/zi4/m/n/10 raw[]\T1/ptm/m/n/10 , ob-jects of class []\T1/zi4/m/n/10 ABF []\T1/ptm/m/n/10 or []\T1/zi4/m/n/10 zeus_abf_raw []\T1/ptm/m/n/10 are con-verted to ZEUS long for-mat with [][][]\T1/zi4/m/n/10 abf_as_df_long()[][][]
+[25]
+Overfull \hbox (35.91003pt too wide) in paragraph at lines 1330--1333
+[]\T1/ptm/m/n/10 Supported com-po-nents are: []\T1/zi4/m/n/10 raw[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 traces_280[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 traces_70[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 photocell[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 stimresp_qc[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 stimresp_settings[]\T1/ptm/m/n/10 ,
+[26] [27] [28]
+Overfull \hbox (0.11917pt too wide) in paragraph at lines 1522--1525
+\T1/ptm/m/n/10 when []\T1/zi4/m/n/10 photocell_auto_scale = TRUE[]\T1/ptm/m/n/10 . De-fault is []\T1/zi4/m/n/10 1.1 []\T1/ptm/m/n/10 (110% of the ERG range). 
+[29] [30] [31] [32]
+Overfull \hbox (0.10808pt too wide) in paragraph at lines 1784--1786
+[]\T1/ptm/m/n/10 Integer running-average win-dow size for av-er-aged stimulus-response traces. Use
+[33]
+Overfull \hbox (34.79831pt too wide) in paragraph at lines 1811--1814
+[]\T1/ptm/m/n/10 Builds a report-ready sum-mary of A-, B-, and D-wave peak mea-sure-ments us-ing [][][]\T1/zi4/m/n/10 extract_irrad_wl_amp()[][][][]\T1/ptm/m/n/10 .
+[34]
+Overfull \hbox (18.67738pt too wide) in paragraph at lines 1882--1884
+[]\T1/ptm/m/n/10 Computes match counts and per-cent-ages for log-i-cal protocol-comparison columns such as []\T1/zi4/m/n/10 label_match[]\T1/ptm/m/n/10 ,
+[35] [36] (/private/var/folders/t0/ftzbgx6j5xb2smm3sb89p73c0000gn/T/RtmpZvyJfe/Rd2pdfd9e8202391a5/Rd2.ind [37]
+Overfull \hbox (8.3567pt too wide) in paragraph at lines 21--23
+[]| \T1/zi4/m/n/10 zeus_prepare_peak_statistics_export\T1/ptm/m/n/10 , 
+[38] [39]) (/private/var/folders/t0/ftzbgx6j5xb2smm3sb89p73c0000gn/T/RtmpZvyJfe/Rd2pdfd9e8202391a5/Rd2.aux)
+
+Package rerunfilecheck Warning: File `Rd2.out' has changed.
+(rerunfilecheck)                Rerun to get outlines right
+(rerunfilecheck)                or use package `bookmark'.
+
+ )
+(see the transcript file for additional information)
+pdfTeX warning (dest): name{Rfn.shiny::runApp\(\)} has been referenced but does not exist, replaced by a fixed one
+
+
+pdfTeX warning (dest): name{Rfn.readABF::readABF\(\)} has been referenced but does not exist, replaced by a fixed one
+
+
+pdfTeX warning (dest): name{Rfn.grepl} has been referenced but does not exist, replaced by a fixed one
+
+</Users/loganouellette/Library/TinyTeX/texmf-dist/fonts/type1/public/inconsolata/Inconsolata-zi4r.pfb></Users/loganouellette/Library/TinyTeX/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></Users/loganouellette/Library/TinyTeX/texmf-dist/fonts/type1/urw/times/utmb8a.pfb></Users/loganouellette/Library/TinyTeX/texmf-dist/fonts/type1/urw/times/utmr8a.pfb></Users/loganouellette/Library/TinyTeX/texmf-dist/fonts/type1/urw/times/utmr8a.pfb></Users/loganouellette/Library/TinyTeX/texmf-dist/fonts/type1/urw/times/utmri8a.pfb>
+Output written on Rd2.pdf (39 pages, 161152 bytes).
+Transcript written on Rd2.log.
+This is makeindex, version 2.18 [TeX Live 2026] (kpathsea + Thai support).
+Scanning input file Rd2.idx....done (86 entries accepted, 0 rejected).
+Sorting entries....done (550 comparisons).
+Generating output file Rd2.ind....done (130 lines written, 0 warnings).
+Output written in Rd2.ind.
+Transcript written in Rd2.ilg.
+This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex)
+ restricted \write18 enabled.
+entering extended mode
+LaTeX2e <2025-11-01>
+L3 programming layer <2026-03-20>
+(./Rd2.tex
+(/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/base/book.cls
+Document Class: book 2025/01/22 v1.4n Standard LaTeX document class
+(/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/base/bk10.clo)) (/Library/Frameworks/R.framework/Resources/share/texmf/tex/latex/Rd.sty (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/base/ifthen.sty) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/generic/iftex/iftex.sty) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/tools/longtable.sty) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/tools/bm.sty) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/base/alltt.sty) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/tools/verbatim.sty) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/url/url.sty) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/base/textcomp.sty) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/amsmath/amsmath.sty
+For additional information on amsmath, use the `?' option.
+(/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/amsmath/amstext.sty (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/amsmath/amsgen.sty)) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/amsmath/amsbsy.sty) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/amsmath/amsopn.sty)) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/amsfonts/amsfonts.sty) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/amsfonts/amssymb.sty) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/jknapltx/mathrsfs.sty) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/base/fontenc.sty) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/psnfss/times.sty) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/inconsolata/zi4.sty `inconsolata-zi4' v1.12, 2019/05/17 Text macros for Inconsolata (msharpe) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/xkeyval/xkeyval.sty (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/generic/xkeyval/xkeyval.tex (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/generic/xkeyval/xkvutils.tex (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/generic/xkeyval/keyval.tex))))) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/graphics/color.sty (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/graphics-cfg/color.cfg) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/graphics-def/pdftex.def) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/graphics/mathcolor.ltx)) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/hyperref/hyperref.sty (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/kvsetkeys/kvsetkeys.sty) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/generic/kvdefinekeys/kvdefinekeys.sty) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/generic/pdfescape/pdfescape.sty (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/generic/ltxcmds/ltxcmds.sty) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/generic/pdftexcmds/pdftexcmds.sty (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/generic/infwarerr/infwarerr.sty))) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/hycolor/hycolor.sty) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/hyperref/nameref.sty (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/refcount/refcount.sty) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/generic/gettitlestring/gettitlestring.sty (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/kvoptions/kvoptions.sty))) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/etoolbox/etoolbox.sty) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/generic/stringenc/stringenc.sty) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/hyperref/pd1enc.def) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/generic/intcalc/intcalc.sty) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/hyperref/puenc.def) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/generic/bitset/bitset.sty (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/generic/bigintcalc/bigintcalc.sty))) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/hyperref/hpdftex.def (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/rerunfilecheck/rerunfilecheck.sty (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/generic/uniquecounter/uniquecounter.sty)))) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/base/makeidx.sty)
+Writing index file Rd2.idx
+(/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/psnfss/t1ptm.fd) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/l3backend/l3backend-pdftex.def) (/private/var/folders/t0/ftzbgx6j5xb2smm3sb89p73c0000gn/T/RtmpZvyJfe/Rd2pdfd9e8202391a5/Rd2.aux) (/private/var/folders/t0/ftzbgx6j5xb2smm3sb89p73c0000gn/T/RtmpZvyJfe/Rd2pdfd9e8202391a5/Rd2.out) (/private/var/folders/t0/ftzbgx6j5xb2smm3sb89p73c0000gn/T/RtmpZvyJfe/Rd2pdfd9e8202391a5/Rd2.out) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/inconsolata/t1zi4.fd) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/amsfonts/umsa.fd) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/amsfonts/umsb.fd) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/jknapltx/ursfs.fd) (/private/var/folders/t0/ftzbgx6j5xb2smm3sb89p73c0000gn/T/RtmpZvyJfe/Rd2pdfd9e8202391a5/Rd2.toc [1{/Users/loganouellette/Library/TinyTeX/texmf-var/fonts/map/pdftex/updmap/pdftex.map}{/Users/loganouellette/Library/TinyTeX/texmf-dist/fonts/enc/dvips/base/8r.enc}{/Users/loganouellette/Library/TinyTeX/texmf-dist/fonts/enc/dvips/inconsolata/i4-t1-0.enc}]) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/psnfss/ts1ptm.fd) [2] [3]
+Overfull \hbox (5.75911pt too wide) in paragraph at lines 159--162
+[]\T1/ptm/m/n/10 The pho-to-cell is nor-mal-ized to []\T1/zi4/m/n/10 [0, 1][]\T1/ptm/m/n/10 , scaled to oc-cupy []\T1/zi4/m/n/10 photocell_relative_height * erg_range
+[4] [5]
+Overfull \hbox (5.43982pt too wide) in paragraph at lines 240--242
+[]\T1/ptm/m/n/10 Data frame with columns []\T1/zi4/m/n/10 stim_index[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 stim_label[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 sweep[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 time_ms[]\T1/ptm/m/n/10 , and []\T1/zi4/m/n/10 value[]\T1/ptm/m/n/10 . 
+
+Overfull \hbox (7.48907pt too wide) in paragraph at lines 248--250
+[]\T1/ptm/m/n/10 Numeric cut-off. Repli-cates with []\T1/zi4/m/n/10 sd_ratio >= noise_ratio_cutoff []\T1/ptm/m/n/10 are dropped. 
+[6]
+Overfull \hbox (13.24686pt too wide) in paragraph at lines 292--295
+\T1/ptm/m/n/10 base-line cor-rec-tion, op-tional noisy-replicate ex-clu-sion, repli-cate av-er-ag-ing, and op-tional post-averaging
+
+Overfull \hbox (22.22778pt too wide) in paragraph at lines 316--318
+[]\T1/ptm/m/n/10 A long replicate-level trace ta-ble con-tain-ing at least []\T1/zi4/m/n/10 sweep[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 stim_index[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 stim_label[]\T1/ptm/m/n/10 ,
+[7] [8]
+Overfull \hbox (7.48907pt too wide) in paragraph at lines 453--455
+[]\T1/ptm/m/n/10 Numeric cut-off. Repli-cates with []\T1/zi4/m/n/10 sd_ratio >= noise_ratio_cutoff []\T1/ptm/m/n/10 are dropped. 
+[9] [10] [11] [12]
+Overfull \hbox (4.97768pt too wide) in paragraph at lines 669--673
+[]\T1/ptm/m/n/10 Long ERG data with protocol-derived stim-u-lus meta-data added, in-clud-ing []\T1/zi4/m/n/10 stim_index[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 stim_label[]\T1/ptm/m/n/10 ,
+
+Overfull \hbox (4.88098pt too wide) in paragraph at lines 669--673
+[]\T1/zi4/m/n/10 protocol_id[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 protocol_variant[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 stim_type[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 block_index[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 within_block_index[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 wavelength[]\T1/ptm/m/n/10 ,
+[13] [14]
+Overfull \hbox (10.11722pt too wide) in paragraph at lines 766--768
+[]\T1/ptm/m/n/10 Numeric scalar used only for absolute-time fall-back when com-put-ing post-stimulus
+
+Overfull \hbox (58.03856pt too wide) in paragraph at lines 771--773
+[]\T1/ptm/m/n/10 Numeric length-2 vec-tor for the main trough search. If []\T1/zi4/m/n/10 NULL[]\T1/ptm/m/n/10 , de-faults to []\T1/zi4/m/n/10 response_window_ms[]\T1/ptm/m/n/10 . 
+
+Overfull \hbox (50.8086pt too wide) in paragraph at lines 774--776
+[]\T1/ptm/m/n/10 Numeric length-2 vec-tor for the main peak search. If []\T1/zi4/m/n/10 NULL[]\T1/ptm/m/n/10 , de-faults to []\T1/zi4/m/n/10 response_window_ms[]\T1/ptm/m/n/10 . 
+[15]
+Overfull \hbox (44.78883pt too wide) in paragraph at lines 786--788
+[]\T1/ptm/m/n/10 Numeric length-2 vec-tor for the d-wave peak search. If []\T1/zi4/m/n/10 NULL[]\T1/ptm/m/n/10 , de-faults to []\T1/zi4/m/n/10 dwave_window_ms[]\T1/ptm/m/n/10 . 
+[16] [17] [18] [19] [20] [21] [22] [23] [24]
+Overfull \hbox (52.25pt too wide) in paragraph at lines 1282--1285
+[]\T1/ptm/m/n/10 Supported com-po-nents are: []\T1/zi4/m/n/10 raw[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 traces_280[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 traces_70[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 photocell[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 stimresp_qc[]\T1/ptm/m/n/10 , and []\T1/zi4/m/n/10 stimresp_settings[]\T1/ptm/m/n/10 . 
+
+Overfull \hbox (30.15782pt too wide) in paragraph at lines 1286--1288
+[]\T1/ptm/m/n/10 For []\T1/zi4/m/n/10 raw[]\T1/ptm/m/n/10 , ob-jects of class []\T1/zi4/m/n/10 ABF []\T1/ptm/m/n/10 or []\T1/zi4/m/n/10 zeus_abf_raw []\T1/ptm/m/n/10 are con-verted to ZEUS long for-mat with [][][]\T1/zi4/m/n/10 abf_as_df_long()[][][]
+
+Overfull \hbox (35.91003pt too wide) in paragraph at lines 1292--1295
+[]\T1/ptm/m/n/10 Supported com-po-nents are: []\T1/zi4/m/n/10 raw[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 traces_280[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 traces_70[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 photocell[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 stimresp_qc[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 stimresp_settings[]\T1/ptm/m/n/10 ,
+
+Overfull \hbox (30.15782pt too wide) in paragraph at lines 1296--1298
+[]\T1/ptm/m/n/10 For []\T1/zi4/m/n/10 raw[]\T1/ptm/m/n/10 , ob-jects of class []\T1/zi4/m/n/10 ABF []\T1/ptm/m/n/10 or []\T1/zi4/m/n/10 zeus_abf_raw []\T1/ptm/m/n/10 are con-verted to ZEUS long for-mat with [][][]\T1/zi4/m/n/10 abf_as_df_long()[][][]
+[25]
+Overfull \hbox (35.91003pt too wide) in paragraph at lines 1330--1333
+[]\T1/ptm/m/n/10 Supported com-po-nents are: []\T1/zi4/m/n/10 raw[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 traces_280[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 traces_70[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 photocell[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 stimresp_qc[]\T1/ptm/m/n/10 , []\T1/zi4/m/n/10 stimresp_settings[]\T1/ptm/m/n/10 ,
+[26] [27] [28]
+Overfull \hbox (0.11917pt too wide) in paragraph at lines 1522--1525
+\T1/ptm/m/n/10 when []\T1/zi4/m/n/10 photocell_auto_scale = TRUE[]\T1/ptm/m/n/10 . De-fault is []\T1/zi4/m/n/10 1.1 []\T1/ptm/m/n/10 (110% of the ERG range). 
+[29] [30] [31] [32]
+Overfull \hbox (0.10808pt too wide) in paragraph at lines 1784--1786
+[]\T1/ptm/m/n/10 Integer running-average win-dow size for av-er-aged stimulus-response traces. Use
+[33]
+Overfull \hbox (34.79831pt too wide) in paragraph at lines 1811--1814
+[]\T1/ptm/m/n/10 Builds a report-ready sum-mary of A-, B-, and D-wave peak mea-sure-ments us-ing [][][]\T1/zi4/m/n/10 extract_irrad_wl_amp()[][][][]\T1/ptm/m/n/10 .
+[34]
+Overfull \hbox (18.67738pt too wide) in paragraph at lines 1882--1884
+[]\T1/ptm/m/n/10 Computes match counts and per-cent-ages for log-i-cal protocol-comparison columns such as []\T1/zi4/m/n/10 label_match[]\T1/ptm/m/n/10 ,
+[35] [36] (/private/var/folders/t0/ftzbgx6j5xb2smm3sb89p73c0000gn/T/RtmpZvyJfe/Rd2pdfd9e8202391a5/Rd2.ind [37]
+Overfull \hbox (8.3567pt too wide) in paragraph at lines 22--24
+[]| \T1/zi4/m/n/10 zeus_prepare_peak_statistics_export\T1/ptm/m/n/10 , 
+[38] [39]) (/private/var/folders/t0/ftzbgx6j5xb2smm3sb89p73c0000gn/T/RtmpZvyJfe/Rd2pdfd9e8202391a5/Rd2.aux) )
+(see the transcript file for additional information)
+pdfTeX warning (dest): name{Rfn.shiny::runApp\(\)} has been referenced but does not exist, replaced by a fixed one
+
+
+pdfTeX warning (dest): name{Rfn.readABF::readABF\(\)} has been referenced but does not exist, replaced by a fixed one
+
+
+pdfTeX warning (dest): name{Rfn.grepl} has been referenced but does not exist, replaced by a fixed one
+
+</Users/loganouellette/Library/TinyTeX/texmf-dist/fonts/type1/public/inconsolata/Inconsolata-zi4r.pfb></Users/loganouellette/Library/TinyTeX/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></Users/loganouellette/Library/TinyTeX/texmf-dist/fonts/type1/urw/times/utmb8a.pfb></Users/loganouellette/Library/TinyTeX/texmf-dist/fonts/type1/urw/times/utmr8a.pfb></Users/loganouellette/Library/TinyTeX/texmf-dist/fonts/type1/urw/times/utmr8a.pfb></Users/loganouellette/Library/TinyTeX/texmf-dist/fonts/type1/urw/times/utmri8a.pfb>
+Output written on Rd2.pdf (39 pages, 161671 bytes).
+Transcript written on Rd2.log.
+Saving output to ‘ZEUS-manual.pdf’ ...
+Done
+You may want to clean up by 'rm -Rf /var/folders/t0/ftzbgx6j5xb2smm3sb89p73c0000gn/T//RtmpZvyJfe/Rd2pdfd9e8202391a5'

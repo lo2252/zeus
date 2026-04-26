@@ -1,0 +1,25 @@
+Package: ZEUS
+Title: Zebrafish Electroretinography Utility Suite
+Version: 0.1.1
+Authors@R: 
+    person("Logan", "Ouellette", email = "ouellettelogan4@gmail.com",
+           role = c("aut", "cre"))
+Author: Logan Ouellette [aut, cre]
+Maintainer: Logan Ouellette <ouellettelogan4@gmail.com>
+Description: Imports ABF electrophysiology recordings, applies ZEUS C0 and C1
+    stimulus-response protocol metadata, computes averaged ERG traces and
+    peak statistics, and exports validation-ready summaries for downstream
+    analysis.
+URL: https://github.com/lo2252/zeus
+BugReports: https://github.com/lo2252/zeus/issues
+License: MIT + file LICENSE
+Encoding: UTF-8
+Depends: R (>= 4.1.0)
+Imports: bslib, dplyr, DT, ggplot2, pkgload, purrr, readABF, rlang,
+        scales, shiny, signal, stringr, tibble, tidyr, zoo
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.3
+Suggests: rstudioapi, testthat (>= 3.0.0)
+Config/testthat/edition: 3
+NeedsCompilation: no
+Packaged: 2026-04-26 19:22:07 UTC; loganouellette

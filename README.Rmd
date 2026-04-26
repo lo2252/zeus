@@ -17,7 +17,7 @@ knitr::opts_chunk$set(
 )
 ```
 
-# ZEUS
+# The Zebrafish Electroretinography Utitlity Suite (ZEUS)
 
 <!-- badges: start -->
 [![Lifecycle: experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](https://lifecycle.r-lib.org/articles/stages.html#experimental)
@@ -32,7 +32,7 @@ against reference exports, and exporting analysis-ready tables.
 
 Package metadata:
 
-- Version: `0.0.0.9000`
+- Version: `0.1.1`
 - License: `MIT` license, see `LICENSE.md`
 - R requirement: `R >= 4.1.0`
 
