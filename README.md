@@ -1,9 +1,7 @@
 
 <!-- README.md is generated from README.Rmd. Do not edit README.md directly. Edit README.Rmd and then rebuild the README. -->
 
-<p align="center">
-  <img src="app/www/ZEUS_Logo6.png" alt="ZEUS logo" width="280">
-</p>
+![ZEUS logo](app/www/ZEUS_Logo6.png)
 
 # ZEUS
 
