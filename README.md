@@ -24,7 +24,7 @@ and exporting analysis-ready tables.
 
 Package metadata:
 
-- Version: `0.0.0.9000`
+- Version: `0.1.0`
 - License: `MIT` license, see `LICENSE.md`
 - R requirement: `R >= 4.1.0`
 
