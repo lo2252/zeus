@@ -33,14 +33,14 @@ R and produce outputs that are easier to validate, version, and reuse.
 Core capabilities include:
 
 - ABF import with `readABF`
-- sweep-to-protocol labeling for ZEUS `C0` and `C1`
-- replicate-aware averaging into 70-condition stimulus-response traces
-- baseline correction, smoothing, and noisy-trace filtering
-- waveform plotting for mean, spectral, and intensity-response summaries
+- Sweep-to-protocol labeling for ZEUS `C0` and `C1`
+- Replicate-aware averaging into 70-condition stimulus-response traces
+- Baseline correction, smoothing, and noisy-trace filtering
+- Waveform plotting for mean, spectral, and intensity-response summaries
 - A-wave, B-wave, and D-wave peak summary tables
 - CSV bundle and Excel workbook export helpers
-- validation utilities for comparison against Origin StimResp exports
-- a Shiny app for interactive review and export
+- Validation utilities for comparison against Origin StimResp exports
+- A Shiny app for interactive review and export
 
 ## Installation
 
