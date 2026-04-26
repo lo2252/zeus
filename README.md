@@ -1,7 +1,10 @@
 
 <!-- README.md is generated from README.Rmd. Do not edit README.md directly. Edit README.Rmd and then rebuild the README. -->
 
+<p align="center">
+
 <img src="app/www/ZEUS_Logo6.png" alt="ZEUS logo" width="180" />
+</p>
 
 # ZEUS
 
@@ -18,6 +21,12 @@ reproducible pipeline for importing raw recordings, mapping sweeps to
 protocol metadata, generating averaged stimulus-response traces,
 extracting peak summaries, validating outputs against reference exports,
 and exporting analysis-ready tables.
+
+Package metadata:
+
+- Version: `0.0.0.9000`
+- License: `MIT` license, see `LICENSE.md`
+- R requirement: `R >= 4.1.0`
 
 The package supports both:
 
@@ -62,6 +71,38 @@ remotes::install_github("lo2252/zeus")
 ```
 
 ZEUS depends on R 4.1 or later.
+
+## Package dependencies
+
+The authoritative dependency list lives in `DESCRIPTION`, but for
+convenience the main package dependencies are listed here as well.
+
+Required runtime packages:
+
+- `bslib`
+- `dplyr`
+- `DT`
+- `ggplot2`
+- `pkgload`
+- `purrr`
+- `readABF`
+- `rlang`
+- `scales`
+- `shiny`
+- `signal`
+- `stringr`
+- `tibble`
+- `tidyr`
+- `zoo`
+
+Suggested packages used for development or testing:
+
+- `rstudioapi`
+- `testthat`
+
+If you install ZEUS from GitHub with `pak::pak()` or
+`remotes::install_github()`, these package dependencies are installed
+automatically.
 
 ## Included example data
 
@@ -273,20 +314,10 @@ README so the rendered file stays in sync.
 
 ## Authorship and Contributions
 
-ZEUS is authored and maintained by Logan Ouellette.
-
-Primary contributions include:
-
-- package design and analysis workflow development
-- protocol mapping and validation logic for ZEUS `C0` and `C1` recordings
-- implementation of import, plotting, export, and Shiny application
-  features
-- authorship, review, and curation of package documentation
-
-AI-assisted support was used during development and documentation to
-help with drafting, editing, code iteration, and implementation
-acceleration. Final scientific interpretation, software decisions, and
-content review were carried out by the package author.
+ZEUS is authored and maintained by Logan Ouellette. AI-assisted support
+was used during development and documentation to help with drafting,
+editing, and code iteration. Final scientific interpretation, software
+decisions, and content review were carried out by the package author.
 
 ## References
 
@@ -297,5 +328,4 @@ content review were carried out by the package author.
 - Masson, G. S. (2019). `readABF`: Import Axon Binary File Format Data.
   CRAN package. <https://CRAN.R-project.org/package=readABF>
 - OriginLab. Origin and OriginPro. Reference software used for
-  comparison in ZEUS validation workflows.
-  <https://www.originlab.com/>
+  comparison in ZEUS validation workflows. <https://www.originlab.com/>

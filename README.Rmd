@@ -4,7 +4,9 @@ output: github_document
 
 <!-- README.md is generated from README.Rmd. Do not edit README.md directly. Edit README.Rmd and then rebuild the README. -->
 
-<img src="app/www/ZEUS_Logo6.png" alt="ZEUS logo" width="180" />
+<p align="center">
+  <img src="app/www/ZEUS_Logo6.png" alt="ZEUS logo" width="180" />
+</p>
 
 ```{r, include = FALSE}
 knitr::opts_chunk$set(
@@ -312,19 +314,8 @@ rendered file stays in sync.
 
 ## Authorship and Contributions
 
-ZEUS is authored and maintained by Logan Ouellette.
-
-Primary contributions include:
-
-- package design and analysis workflow development
-- protocol mapping and validation logic for ZEUS `C0` and `C1` recordings
-- implementation of import, plotting, export, and Shiny application features
-- authorship, review, and curation of package documentation
-
-AI-assisted support was used during development and documentation to help with
-drafting, editing, code iteration, and implementation acceleration. Final
-scientific interpretation, software decisions, and content review were carried
-out by the package author.
+ZEUS is authored and maintained by Logan Ouellette. AI-assisted support was used during development and documentation to help with
+drafting, editing, and code iteration. Final scientific interpretation, software decisions, and content review were carried out by the package author.
 
 ## References
 
