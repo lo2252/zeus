@@ -63,7 +63,7 @@ Core capabilities include:
 
 ## Installation
 
-ZEUS is currently a development package and can be installed from GitHub.
+ZEUS is available from its public GitHub repository:
 
 ``` r
 # install.packages("pak")
