@@ -33,14 +33,14 @@ R and produce outputs that are easier to validate, version, and reuse.
 Core capabilities include:
 
 - ABF import with `readABF`
-- Sweep-to-protocol labeling for ZEUS `C0` and `C1`
-- Replicate-aware averaging into 70-condition stimulus-response traces
-- Baseline correction, smoothing, and noisy-trace filtering
-- Waveform plotting for mean, spectral, and intensity-response summaries
+- sweep-to-protocol labeling for ZEUS `C0` and `C1`
+- replicate-aware averaging into 70-condition stimulus-response traces
+- baseline correction, smoothing, and noisy-trace filtering
+- waveform plotting for mean, spectral, and intensity-response summaries
 - A-wave, B-wave, and D-wave peak summary tables
 - CSV bundle and Excel workbook export helpers
-- Validation utilities for comparison against Origin StimResp exports
-- A Shiny app for interactive review and export
+- validation utilities for comparison against Origin StimResp exports
+- a Shiny app for interactive review and export
 
 ## Installation
 
@@ -60,38 +60,6 @@ remotes::install_github("lo2252/zeus")
 ```
 
 ZEUS depends on R 4.1 or later.
-
-## Package dependencies
-
-The authoritative dependency list lives in `DESCRIPTION`, but for
-convenience the main package dependencies are listed here as well.
-
-Required runtime packages:
-
-- `bslib`
-- `dplyr`
-- `DT`
-- `ggplot2`
-- `pkgload`
-- `purrr`
-- `readABF`
-- `rlang`
-- `scales`
-- `shiny`
-- `signal`
-- `stringr`
-- `tibble`
-- `tidyr`
-- `zoo`
-
-Suggested packages used for development or testing:
-
-- `rstudioapi`
-- `testthat`
-
-If you install ZEUS from GitHub with `pak::pak()` or
-`remotes::install_github()`, these package dependencies are installed
-automatically.
 
 ## Included example data
 

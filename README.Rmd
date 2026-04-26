@@ -2,7 +2,7 @@
 output: github_document
 ---
 
-<!-- README.md is generated from README.Rmd. Please edit that file -->
+<!-- README.md is generated from README.Rmd. Do not edit README.md directly. Edit README.Rmd and then rebuild the README. -->
 
 ```{r, include = FALSE}
 knitr::opts_chunk$set(
@@ -25,6 +25,12 @@ protocols used in the ZENV workflow and provides a reproducible pipeline for
 importing raw recordings, mapping sweeps to protocol metadata, generating
 averaged stimulus-response traces, extracting peak summaries, validating outputs
 against reference exports, and exporting analysis-ready tables.
+
+Package metadata:
+
+- Version: `0.0.0.9000`
+- License: `MIT` license, see `LICENSE.md`
+- R requirement: `R >= 4.1.0`
 
 The package supports both:
 
@@ -301,3 +307,11 @@ workflow is already in place.
 Issues and pull requests are welcome. If you are extending the package, edit
 `README.Rmd` rather than `README.md`, then regenerate the Markdown README so the
 rendered file stays in sync.
+
+## Author
+
+ZEUS is authored and maintained by Logan Ouellette.
+
+This package and its documentation were developed with AI-assisted support used
+for drafting, editing, and implementation acceleration, with final review and
+curation by the package author.
