@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex 2026.4.26)  26 APR 2026 15:23
+This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex 2026.4.26)  26 APR 2026 16:05
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -289,7 +289,7 @@ File: t1ptm.fd 2001/06/04 font definitions for T1/ptm.
 ) (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/l3backend/l3backend-pdftex.def
 File: l3backend-pdftex.def 2026-02-18 L3 backend support: PDF output (pdfTeX)
 \l__color_backend_stack_int=\count315
-) (/private/var/folders/t0/ftzbgx6j5xb2smm3sb89p73c0000gn/T/RtmpZvyJfe/Rd2pdfd9e8202391a5/Rd2.aux)
+) (/private/var/folders/t0/ftzbgx6j5xb2smm3sb89p73c0000gn/T/RtmpL8x8e5/Rd2pdfe6837069569f/Rd2.aux)
 \openout1 = `Rd2.aux'.
 
 LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 8.
@@ -311,7 +311,7 @@ LaTeX Font Info:    ... okay on input line 8.
 LaTeX Font Info:    Checking defaults for PU/pdf/m/n on input line 8.
 LaTeX Font Info:    ... okay on input line 8.
 Package hyperref Info: Link coloring ON on input line 8.
- (/private/var/folders/t0/ftzbgx6j5xb2smm3sb89p73c0000gn/T/RtmpZvyJfe/Rd2pdfd9e8202391a5/Rd2.out) (/private/var/folders/t0/ftzbgx6j5xb2smm3sb89p73c0000gn/T/RtmpZvyJfe/Rd2pdfd9e8202391a5/Rd2.out)
+ (/private/var/folders/t0/ftzbgx6j5xb2smm3sb89p73c0000gn/T/RtmpL8x8e5/Rd2pdfe6837069569f/Rd2.out) (/private/var/folders/t0/ftzbgx6j5xb2smm3sb89p73c0000gn/T/RtmpL8x8e5/Rd2pdfe6837069569f/Rd2.out)
 \@outlinefile=\write4
 \openout4 = `Rd2.out'.
 
@@ -332,7 +332,7 @@ File: umsb.fd 2013/01/14 v3.01 AMS symbols B
 LaTeX Font Info:    Trying to load font information for U+rsfs on input line 26.
  (/Users/loganouellette/Library/TinyTeX/texmf-dist/tex/latex/jknapltx/ursfs.fd
 File: ursfs.fd 1998/03/24 rsfs font definition file (jk)
-) (/private/var/folders/t0/ftzbgx6j5xb2smm3sb89p73c0000gn/T/RtmpZvyJfe/Rd2pdfd9e8202391a5/Rd2.toc [1
+) (/private/var/folders/t0/ftzbgx6j5xb2smm3sb89p73c0000gn/T/RtmpL8x8e5/Rd2pdfe6837069569f/Rd2.toc [1
 
 
 {/Users/loganouellette/Library/TinyTeX/texmf-var/fonts/map/pdftex/updmap/pdftex.map}{/Users/loganouellette/Library/TinyTeX/texmf-dist/fonts/enc/dvips/base/8r.enc}{/Users/loganouellette/Library/TinyTeX/texmf-dist/fonts/enc/dvips/inconsolata/i4-t1-0.enc}])
@@ -447,7 +447,7 @@ Overfull \hbox (18.67738pt too wide) in paragraph at lines 1882--1884
 []\T1/ptm/m/n/10 Computes match counts and per-cent-ages for log-i-cal protocol-comparison columns such as []\T1/zi4/m/n/10 label_match[]\T1/ptm/m/n/10 ,
  []
 
-[35] [36] (/private/var/folders/t0/ftzbgx6j5xb2smm3sb89p73c0000gn/T/RtmpZvyJfe/Rd2pdfd9e8202391a5/Rd2.ind [37]
+[35] [36] (/private/var/folders/t0/ftzbgx6j5xb2smm3sb89p73c0000gn/T/RtmpL8x8e5/Rd2pdfe6837069569f/Rd2.ind [37]
 Overfull \hbox (8.3567pt too wide) in paragraph at lines 22--24
 []| \T1/zi4/m/n/10 zeus_prepare_peak_statistics_export\T1/ptm/m/n/10 , 
  []
@@ -456,7 +456,7 @@ Overfull \hbox (8.3567pt too wide) in paragraph at lines 22--24
 
 ] [39
 
-]) (/private/var/folders/t0/ftzbgx6j5xb2smm3sb89p73c0000gn/T/RtmpZvyJfe/Rd2pdfd9e8202391a5/Rd2.aux)
+]) (/private/var/folders/t0/ftzbgx6j5xb2smm3sb89p73c0000gn/T/RtmpL8x8e5/Rd2pdfe6837069569f/Rd2.aux)
  ***********
 LaTeX2e <2025-11-01>
 L3 programming layer <2026-03-20>

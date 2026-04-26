@@ -10,12 +10,12 @@
 * checking for file ‘ZEUS/DESCRIPTION’ ... OK
 * this is package ‘ZEUS’ version ‘0.1.1’
 * package encoding: UTF-8
-* checking CRAN incoming feasibility ... [2s/10s] NOTE
+* checking CRAN incoming feasibility ... [2s/19s] NOTE
 Maintainer: ‘Logan Ouellette <ouellettelogan4@gmail.com>’
 
 New submission
 
-Size of tarball: 6544855 bytes
+Size of tarball: 6544882 bytes
 * checking package namespace information ... OK
 * checking package dependencies ... OK
 * checking if this is a source package ... OK
@@ -31,7 +31,11 @@ Size of tarball: 6544855 bytes
     extdata   8.6Mb
 * checking package directory ... OK
 * checking for future file timestamps ... OK
-* checking DESCRIPTION meta-information ... OK
+* checking DESCRIPTION meta-information ... NOTE
+Author field differs from that derived from Authors@R
+  Author:    ‘Logan Ouellette [aut, cre]’
+  Authors@R: ‘Logan Ouellette [aut, cre] (ORCID: <https://orcid.org/0009-0006-1461-8938>)’
+
 * checking top-level files ... OK
 * checking for left-over files ... OK
 * checking index information ... OK
@@ -60,11 +64,11 @@ Size of tarball: 6544855 bytes
 * checking for unstated dependencies in examples ... OK
 * checking examples ... NONE
 * checking for unstated dependencies in ‘tests’ ... OK
-* checking tests ... [59s/59s] OK
-  Running ‘testthat.R’ [58s/59s]
+* checking tests ... [61s/61s] OK
+  Running ‘testthat.R’ [61s/61s]
 * checking PDF version of manual ... OK
 * checking HTML version of manual ... OK
 * checking for non-standard things in the check directory ... OK
 * checking for detritus in the temp directory ... OK
 * DONE
-Status: 1 NOTE
+Status: 2 NOTEs
