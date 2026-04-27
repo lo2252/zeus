@@ -5,7 +5,6 @@ Authors@R:
     person("Logan", "Ouellette", email = "ouellettelogan4@gmail.com",
            role = c("aut", "cre"),
            comment = c(ORCID = "0009-0006-1461-8938"))
-Author: Logan Ouellette [aut, cre]
 Maintainer: Logan Ouellette <ouellettelogan4@gmail.com>
 Description: Imports ABF electrophysiology recordings, applies ZEUS C0 and C1
     stimulus-response protocol metadata, computes averaged ERG traces and
@@ -23,5 +22,7 @@ RoxygenNote: 7.3.3
 Suggests: rstudioapi, testthat (>= 3.0.0)
 Config/testthat/edition: 3
 NeedsCompilation: no
-Packaged: 2026-04-26 20:03:58 UTC; loganouellette
-Built: R 4.5.3; ; 2026-04-26 20:04:20 UTC; unix
+Packaged: 2026-04-26 21:12:36 UTC; loganouellette
+Author: Logan Ouellette [aut, cre] (ORCID:
+    <https://orcid.org/0009-0006-1461-8938>)
+Built: R 4.5.3; ; 2026-04-26 21:13:07 UTC; unix

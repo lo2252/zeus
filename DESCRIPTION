@@ -5,7 +5,6 @@ Authors@R:
     person("Logan", "Ouellette", email = "ouellettelogan4@gmail.com",
            role = c("aut", "cre"),
            comment = c(ORCID = "0009-0006-1461-8938"))
-Author: Logan Ouellette [aut, cre]
 Maintainer: Logan Ouellette <ouellettelogan4@gmail.com>
 Description: Imports ABF electrophysiology recordings, applies ZEUS C0 and C1
     stimulus-response protocol metadata, computes averaged ERG traces and
