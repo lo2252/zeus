@@ -220,11 +220,6 @@ The summary output is designed for reporting and export. It includes
 combined tables for A-wave, B-wave, and D-wave measurements, plus
 ND-level and wavelength-level aggregations where applicable.
 
-## Exporting results
-
-ZEUS can write the major outputs from a processed object to either a set
-of CSV files or a single Excel workbook.
-
 ### Export a CSV bundle
 
 ``` r
@@ -242,15 +237,6 @@ This writes component files such as:
 - `example_run_stimresp_qc.csv`
 - `example_run_stimresp_settings.csv`
 - `example_run_peak_statistics.csv`
-
-### Export an Excel workbook
-
-``` r
-zeus_export_excel_workbook(
-  x,
-  xlsx_path = "exports/example_run.xlsx"
-)
-```
 
 ## Validation against reference exports
 
@@ -304,12 +290,6 @@ ZEUS is under active development and the current lifecycle is marked
 experimental. Public interfaces may continue to evolve as the package
 grows, but the core import, protocol labeling, plotting, validation, and
 export workflow is already in place.
-
-## Contributing
-
-Issues and pull requests are welcome. If you are extending the package,
-edit `README.Rmd` rather than `README.md`, then regenerate the Markdown
-README so the rendered file stays in sync.
 
 ## Authorship and Contributions
 
